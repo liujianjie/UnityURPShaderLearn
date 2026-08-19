@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700" viewBox="0 0 1100 700">
+  <defs>
+    <marker id="greenArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#169b62"/>
+    </marker>
+    <marker id="blueArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#2878d0"/>
+    </marker>
+    <marker id="orangeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#f2a600"/>
+    </marker>
+    <marker id="purpleArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#9b51e0"/>
+    </marker>
+    <marker id="grayArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#777"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="700" fill="#fff"/>
+  <text x="550" y="42" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="27" font-weight="700" fill="#222">worldLightDir、viewDir、halfDir 与 V − L</text>
+
+  <!-- Left panel: directions at the shaded point. -->
+  <rect x="35" y="72" width="505" height="570" rx="14" fill="#fafafa" stroke="#ddd" stroke-width="2"/>
+  <text x="287" y="108" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#333">同一起点：V − L 是从 L 终点指向 V 终点</text>
+
+  <rect x="75" y="510" width="425" height="95" fill="#f05a3f"/>
+  <line x1="75" y1="510" x2="500" y2="510" stroke="#c83f2a" stroke-width="4"/>
+  <circle cx="287" cy="510" r="7" fill="#222"/>
+  <text x="269" y="540" font-family="Arial, Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#222">P</text>
+
+  <!-- L and V use equal lengths so the endpoint-difference construction is exact. -->
+  <line x1="287" y1="510" x2="122" y2="300" stroke="#169b62" stroke-width="6" marker-end="url(#greenArrow)"/>
+  <circle cx="122" cy="300" r="6" fill="#169b62"/>
+  <text x="105" y="272" font-family="Arial, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#169b62">L 的终点</text>
+  <text x="112" y="398" font-family="Arial, Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#169b62">worldLightDir (L)</text>
+
+  <line x1="287" y1="510" x2="452" y2="300" stroke="#2878d0" stroke-width="6" marker-end="url(#blueArrow)"/>
+  <circle cx="452" cy="300" r="6" fill="#2878d0"/>
+  <text x="405" y="272" font-family="Arial, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#2878d0">V 的终点</text>
+  <text x="361" y="398" font-family="Arial, Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#2878d0">viewDir (V)</text>
+
+  <line x1="287" y1="510" x2="287" y2="245" stroke="#f2a600" stroke-width="6" marker-end="url(#orangeArrow)"/>
+  <text x="302" y="244" font-family="Arial, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#f2a600">halfDir = normalize(L + V)</text>
+
+  <!-- Difference vector: endpoint of L to endpoint of V. -->
+  <line x1="122" y1="300" x2="452" y2="300" stroke="#9b51e0" stroke-width="7" marker-end="url(#purpleArrow)"/>
+  <text x="287" y="333" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#9b51e0">V − L（从 L 终点到 V 终点）</text>
+
+  <!-- Right panel: head-to-tail addition. -->
+  <rect x="560" y="72" width="505" height="570" rx="14" fill="#fafafa" stroke="#ddd" stroke-width="2"/>
+  <text x="812" y="108" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#333">首尾相接：(−L) + V</text>
+
+  <circle cx="635" cy="325" r="7" fill="#222"/>
+  <text x="615" y="310" font-family="Arial, Microsoft YaHei, sans-serif" font-size="20" font-weight="700" fill="#222">P</text>
+
+  <!-- First add -L. -->
+  <line x1="635" y1="325" x2="775" y2="475" stroke="#777" stroke-width="6" marker-end="url(#grayArrow)"/>
+  <text x="680" y="422" font-family="Arial, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#666">−L</text>
+
+  <!-- Then add a translated copy of V. -->
+  <line x1="775" y1="475" x2="915" y2="325" stroke="#2878d0" stroke-width="6" stroke-dasharray="11 8" marker-end="url(#blueArrow)"/>
+  <text x="850" y="430" font-family="Arial, Microsoft YaHei, sans-serif" font-size="21" font-weight="700" fill="#2878d0">V（平移后）</text>
+
+  <!-- Result from the first tail to the final head. -->
+  <line x1="635" y1="325" x2="915" y2="325" stroke="#9b51e0" stroke-width="7" marker-end="url(#purpleArrow)"/>
+  <text x="775" y="290" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="22" font-weight="700" fill="#9b51e0">(−L) + V = V − L</text>
+
+  <text x="812" y="540" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="20" fill="#333">紫色箭头位于 −L 与 V 的中间方向</text>
+  <text x="812" y="572" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="20" fill="#333">前提：L、V 都已归一化且结果不为 0</text>
+
+  <text x="550" y="676" text-anchor="middle" font-family="Arial, Microsoft YaHei, sans-serif" font-size="20" fill="#333">向量可以平移，所以两幅图中的紫色箭头虽然起点不同，表示的是同一个自由向量 V − L。</text>
+</svg>
