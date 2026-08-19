@@ -3,7 +3,9 @@
 相关文件：
 
 - [Chapter9-ForwardRendering.shader](../Assets/Shaders/Chapter9/Chapter9-ForwardRendering.shader)
-- [光照方向 SVG 图](../Assets/Shaders/Chapter9/Chapter9-ForwardRendering-Directions.svg)
+- 
+
+## ![Chapter9-ForwardRendering-Directions](assets/Chapter9-ForwardRendering-Directions.svg)
 
 ## 1. 本章使用的方向约定
 
