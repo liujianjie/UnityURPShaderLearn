@@ -12,4 +12,4 @@
 ## 章节索引
 
 - [Chapter 9：前向渲染、光照方向与材质常量缓冲区](Chapter09-ForwardRendering.md)
-
+- [Chapter 9：URP 阴影 Shader 问答](Chapter09-Shadow-QA.md)

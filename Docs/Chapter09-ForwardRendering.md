@@ -3,7 +3,7 @@
 相关文件：
 
 - [Chapter9-ForwardRendering.shader](../Assets/Shaders/Chapter9/Chapter9-ForwardRendering.shader)
-- 
+- [Chapter 9：URP 阴影 Shader 问答](Chapter09-Shadow-QA.md)
 
 ## ![Chapter9-ForwardRendering-Directions](assets/Chapter9-ForwardRendering-Directions.svg)
 
