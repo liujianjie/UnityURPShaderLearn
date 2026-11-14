@@ -42,6 +42,176 @@
 
 阴影通常只削弱直接光，不削弱环境光或其他间接光。否则一个点进入阴影后会连环境照明也消失，结果往往黑得不自然。
 
+### 1.1 把灯光当成一台只拍深度的相机
+
+想象一个方块悬在地板上，方向光竖直向下。对方向光来说，光线互相平行，所以可以用**正交投影**：从灯光视角看，方块顶面 A 和它正下方的地板点 P 会投影到同一个二维位置，但 A 比 P 更靠近灯光。旁边的地板点 Q 投影到另一个位置，光能直接照到它。
+
+![方向光下的方块与地板：侧视图显示 A 和 P 在同一束光上，右侧 4×4 深度贴图的同一格只保留 A 的 0.30；地板点 Q 查到自己的深度 0.80。](assets/Chapter9-ShadowMapping.svg)
+
+这张图的左边是沿世界 Z 轴看的侧视剖面；右边是从灯光方向看下去的二维纹理。**阴影贴图的二维位置来自灯光的视角，和游戏相机画面上的像素位置没有直接对应关系。**
+
+### 1.2 第一次绘制：3D 三角形怎样变成一张二维深度图
+
+配套实验：[沿着一条光线 · Three.js 交互演示](Chapter09-Shadow-Mapping-3D.html)。进入「V · 换轴」，用「下一小步」先认世界轴，再作垂线、逐轴读数；继续可以逐轴换投影刻度、定位纹素并比较深度。
+
+1. **确定灯光视角。** 方向光本身只需要方向；渲染阴影图还需要选一个灯光坐标原点、三根轴和一个有限的覆盖盒。`V_light` 用原点和轴把世界位置换成灯光坐标，`P_light` 再用覆盖盒的边界把灯光坐标映射到裁剪空间。[下面从这些输入构造矩阵，并代入实际数字](#light-matrix-walkthrough)。
+2. **把投影物体的网格画到深度纹理上。** `ShadowCaster` 先把模型顶点变到世界空间，应用阴影 Bias，再用 `P_light × V_light` 变到裁剪空间。GPU 裁剪并做齐次除法（`xyz / w`；本例正交投影的 `w = 1`），再把平面坐标映射到深度纹理的视口。光栅化时，GPU 判断投影后的三角形覆盖了哪些纹素采样位置，并为这些位置算出投影深度。这样，三维位置的前两个投影分量决定「写哪格」，深度分量决定「用什么数去做深度测试」。一个三角形可以覆盖许多格。
+3. **每格只留下最近的一层。** 每个参与投影的片元都和该格已有的深度做深度测试，测试通过才更新。以图中的普通 Z 为例，`[1,2]` 先清成远端值 `1.00`，地板若先画进去会写 `0.80`，方块顶面再以 `0.30` 覆盖它。若先画方块，地板就通不过测试，结果仍是 `0.30`。没有投影片元覆盖的格保留清除值。
+
+为什么 `TransformWorldToHClip` 在这里是从灯光看？[URP 的 `RenderShadowSlice`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/ShadowUtils.cs#L198) 在 `DrawShadows` 之前执行 `cmd.SetViewProjectionMatrices(view, proj)`，把当前绘制使用的视图、投影矩阵切到灯光视角。于是 [本章 `ShadowCaster` 顶点函数](../Assets/Shaders/Chapter9/Chapter9-Shadow.shader#L176) 里的同一个函数用的就是灯光矩阵：
+
+```hlsl
+float3 biasedWorldPos = ApplyShadowBias(worldPos, worldNormal, _LightDirection);
+o.pos = TransformWorldToHClip(biasedWorldPos);
+```
+
+**实际数据结构：** 主光的 `_MainLightShadowmapTexture` 是一张 GPU 上的 `W × H` **二维深度渲染纹理**。可以把它想成 `depth[row][column]`：每个纹素逻辑上只有一个经过量化的投影深度。图里的 `0.30` 不是 RGB、阴影浓度、物体 ID 或世界坐标，也不是「灯到 A 的 0.30 米」。[主光 Pass](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/Passes/MainLightShadowCasterPass.cs#L27) 请求 16 位深度；[`ShadowUtils`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/ShadowUtils.cs#L443) 通过 Unity 选择深度格式，颜色格式为 `None`。调试器把它显示成灰度图，只是为了让人看见深度数值。
+
+<a id="light-matrix-walkthrough"></a>
+
+#### V 和 P 从哪来？把数字代进去算一遍
+
+**实际运行时：Unity 引擎计算，URP 拿来用。** [主光阴影 Pass](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/Passes/MainLightShadowCasterPass.cs#L140) 为每个级联请求一对矩阵。它从当前相机的剔除结果 `cullResults` 出发，传入主光索引、级联编号和分割设置、阴影图分辨率以及灯光的 Shadow Near Plane。这里的相机决定**哪一片场景需要覆盖**，方向光决定**沿什么方向看**。[本项目 URP 14.0.12 的调用](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/ShadowUtils.cs#L110) 如下：
+
+```csharp
+bool success = cullResults.ComputeDirectionalShadowMatricesAndCullingPrimitives(
+    shadowLightIndex, cascadeIndex, shadowData.mainLightShadowCascadesCount,
+    shadowData.mainLightShadowCascadesSplit, shadowResolution, shadowNearPlane,
+    out shadowSliceData.viewMatrix, out shadowSliceData.projectionMatrix,
+    out shadowSliceData.splitData);
+```
+
+[这个 Unity API](https://docs.unity3d.com/cn/6000.0/ScriptReference/Rendering.CullingResults.ComputeDirectionalShadowMatricesAndCullingPrimitives.html) 直接返回 `viewMatrix`（V）和 `projectionMatrix`（P）。本项目的 URP C# 源码能确认输入、输出和使用位置；引擎怎样拟合覆盖盒，不在这段 C# 里。如果想看当前场景某一帧的真实数值，可在[调用结束之后](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/ShadowUtils.cs#L116)打断点，在调用成功时查看这两个字段以及当前的 `cascadeIndex`。
+
+**下面换成可手算的数值。** 这里用 [Three.js 演示中的参数](Chapter09-Shadow-Mapping-3D.html)，不是对 Unity 当前帧矩阵的抄录。这个例子是斜着照的，阴影图宽 4 格、高 6 格；§1.4 的静态图是竖直照的另一组例子。先使用普通 Z，忽略 Bias、级联偏移和过滤。
+
+**第一步：选灯光的三根轴和原点，构造 V。**
+
+**先选两件事，再算出一组轴。** 这组数是教学示例选的起点，并不是从当前 Unity 场景里量出来的。先选光线往哪儿走，再选画面的哪边朝上。光线方向只决定镜头朝哪儿；沿着镜头朝向转动相机，朝向不变，但画面的上方和右方会一起转。所以光线方向本身还不能决定 U 和 R。
+
+1. **选光线方向，再算后轴 K。** 用世界轴写出「右 3、下 4」的箭头 `(3, -4, 0)`，它长 `√(3² + 4²) = 5`。各分量除以 5，得到单位方向 `F = (0.6, -0.8, 0)`。灯光坐标约定正 Z 指向后方，所以取反得到 `K = -F = (-0.6, 0.8, 0)`。
+2. **选一个与光线垂直的上轴 U。** 示例的光线完全在世界 XY 平面里，所以可以选世界 `-Z` 作上方：`U = (0, 0, -1)`。验证：`U · K = 0 × (-0.6) + 0 × 0.8 + (-1) × 0 = 0`。这一步是示例的选择，换一个绕光线转过的上方也可以。
+3. **按右手坐标系算右轴 R。** 右手坐标系要求「上 × 后 = 右」，所以算 `U × K`。叉积的结果与 U、K 都垂直；这里两个输入都长 1，且互相垂直，结果也长 1：
+
+```text
+R = (0, 0, -1) × (-0.6, 0.8, 0)
+  = (0 × 0 - (-1) × 0.8, (-1) × (-0.6) - 0 × 0, 0 × 0.8 - 0 × (-0.6))
+  = (0.8, 0.6, 0)
+```
+
+到这里，**R、U、K 都还是用世界轴写的方向向量**。比如 R 的意思是「沿世界 X 走 0.8，沿世界 Y 走 0.6」，并不是某个点在灯光坐标中的位置。接下来用这三根新轴去量 A，才会得到 A 的灯光坐标。
+
+| 符号 | 在这个例子里怎么选 | 用世界轴 `X、Y、Z` 表示 |
+| --- | --- | --- |
+| `F`：光线向前 | 选「向世界右走 3、向下走 4」的方向，除以长度 5 | `(0.6, -0.8, 0)` |
+| `K`：灯光的后轴 | 用 `-F`，所以灯光坐标里往前走，`zₗ` 会变小 | `(-0.6, 0.8, 0)` |
+| `U`：灯光的上轴 | 选世界 `-Z`，它和光线垂直 | `(0, 0, -1)` |
+| `R`：灯光的右轴 | 取 `U × K`，得到同时垂直于上轴和后轴的单位向量 | `(0.8, 0.6, 0)` |
+| `O`：灯光坐标原点 | 为了让方块点 A 从 O 出发恰好是「向右 1、向上 2、向前 3」，取 `O = A - R - 2U - 3F` | `(0, 5.8, 4)` |
+
+`O` 是灯光视图用来量位置的参考点。方向光的光线彼此平行，所以不能仅凭光线方向推出 `O`；这里选定 `A = (2.6, 4, 2)`，再倒推参考点：`(2.6, 4, 2) - (0.8, 0.6, 0) - (0, 0, -2) - (1.8, -2.4, 0) = (0, 5.8, 4)`。
+
+取方块顶面 `A = (2.6, 4, 2)`，先算 `q = A - O = (2.6, -1.8, -2)`。箭头现在从 O 指向 A，**这三个数依然用世界轴表示**。接着问「这支箭头沿灯光右轴走了多少？」把 `q` 拆成沿 R 的一段和垂直 R 的一段。垂直的那段点积为 0，R 的长度是 1，所以 `q · R` 就是沿 R 的带符号长度。上轴和后轴同理：
+
+```text
+xₗ = q · R = 2.6 ×  0.8 + (-1.8) × 0.6 + (-2) ×  0 =  1
+yₗ = q · U = 2.6 ×  0   + (-1.8) × 0   + (-2) × -1 =  2
+zₗ = q · K = 2.6 × -0.6 + (-1.8) × 0.8 + (-2) ×  0 = -3
+```
+
+矩阵把「减 O」也一起做了。第一行就是 `R · (A - O) = R · A - R · O`：前三列抄 `R`，最后一列填 `-R · O = -(0.6 × 5.8) = -3.48`。第二、三行同理，最后一列分别是 `-U · O = 4` 和 `-K · O = -4.64`。用列向量时，**一行算出一个新分量**：
+
+```text
+             ┌  0.8   0.6   0   -3.48 ┐   ┌ 2.6 ┐   ┌  1 ┐
+V_light × A =│  0     0    -1    4    │ × │ 4   │ = │  2 │
+             │ -0.6   0.8   0   -4.64 │   │ 2   │   │ -3 │
+             └  0     0     0    1    ┘   └ 1   ┘   └  1 ┘
+```
+
+例如把世界位置直接代入第一行：`0.8 × 2.6 + 0.6 × 4 - 3.48 = 1`。输入第四项补 `1`，是为了让最后一列的平移量能加进来。输出的 `zₗ = -3` 表示沿光线向前 3 个单位，记作 `d = -zₗ = 3`。
+
+**第二步：选灯光覆盖盒的六条边界，构造 P。**
+
+演示选择一个能容纳 A 和地板点 B 的盒子：灯光横向 `xₗ ∈ [-4, 4]`、纵向 `yₗ ∈ [0, 8]`、向前的距离 `d ∈ [0, 10]`。正交投影对每一根轴分别换刻度：从旧区间左端走了多少，除以旧区间长度，得到比例；再把这个比例放到从 `-1` 开始、总长为 `2` 的新尺上。
+
+| 轴 | 由覆盖范围得到的公式 | 代入 A 的灯光坐标 |
+| --- | --- | --- |
+| 横向 | `-1 + 2 × (xₗ + 4) / 8 = 0.25 × xₗ` | `-1 + 2 × 5 / 8 = 0.25` |
+| 纵向 | `-1 + 2 × yₗ / 8 = 0.25 × yₗ - 1` | `-1 + 2 × 2 / 8 = -0.5` |
+| 深度 | `-1 + 2 × d / 10 = -0.2 × zₗ - 1` | `-1 + 2 × 3 / 10 = -0.4` |
+
+把这三条公式的乘数和常数填进矩阵，拿**上一步的输出**做输入：
+
+```text
+                  ┌ 0.25   0      0     0 ┐   ┌  1 ┐   ┌  0.25 ┐
+P_light × (V × A) =│ 0      0.25   0    -1 │ × │  2 │ = │ -0.5  │
+                  │ 0      0     -0.2  -1 │   │ -3 │   │ -0.4  │
+                  └ 0      0      0     1 ┘   └  1 ┘   └  1    ┘
+```
+
+乘完 P 得到裁剪坐标。本例是正交投影，第四项 `w = 1`，所以除以 w 后，前三项原样成为 NDC（归一化设备坐标）。横向和纵向两行都没有用 `zₗ`，因此同一条光线上的点即使前后距离不同，横、纵读数仍相同。
+
+**第三步：把 A 和地板 B 都走一遍。** 纹理坐标以 0 到 1 记比例，三个 NDC 分量各做 `0.5 × 数值 + 0.5`。例如 A 的横向 `0.25` 变成 `u = 0.625`，深度 `-0.4` 变成 `z = 0.30`。
+
+| 点 | 世界位置 | 乘 V 后：灯光坐标 | 再乘 P 并除以 w：NDC | 换到纹理刻度 `(u, v, z)` |
+| --- | --- | --- | --- | --- |
+| 方块 A | `(2.6, 4, 2)` | `(1, 2, -3)` | `(0.25, -0.5, -0.4)` | `(0.625, 0.25, 0.30)` |
+| 地板 B | `(5.6, 0, 2)` | `(1, 2, -8)` | `(0.25, -0.5, 0.6)` | `(0.625, 0.25, 0.80)` |
+
+两点的 `u、v` 相同：从 0 开始数，列是 `floor(0.625 × 4) = 2`，行是 `floor(0.25 × 6) = 1`。写图时同一格留下 A 的 `0.30`；读图时用 B 自己的 `0.80` 去比较，发现它在 A 后面。这也就是 `P_light × V_light × 世界位置` 要从右往左读的原因：**V 先产出灯光坐标，P 才能按灯光覆盖盒的范围换刻度。**
+
+### 1.3 第二次绘制：当前表面点怎样得到 `(u, v, z)`
+
+游戏相机绘制地板时，相机投影决定三角形覆盖哪些屏幕像素。前向顶点函数把每个顶点的**世界位置**写进 `o.worldPos`；GPU 在相机画面里光栅化三角形时，对这些世界位置做透视校正插值，因此 `frag` 收到的 `i.worldPos` 就是当前片元对应的表面位置。接着 Shader 用**灯光的投影**查这个点是否被挡住。
+
+```hlsl
+// Chapter9-Shadow.shader：前向 Pass 的 vert 中
+o.worldPos = positionInputs.positionWS;
+
+// 同一 Pass 的 frag 中
+float4 shadowCoord = TransformWorldToShadowCoord(i.worldPos);
+Light mainLight = GetMainLight(shadowCoord);
+```
+
+在普通或级联方向光阴影路径中，`TransformWorldToShadowCoord` 把世界位置乘以 `_MainLightWorldToShadow[cascadeIndex]`，返回 `(u, v, z, 0)`。这个矩阵使用**写图时同一份灯光视图和投影**，还包含纹理坐标所需的缩放和偏移（以及相应的深度方向处理）。写图时，GPU 把投影位置映射到视口内的纹素；读图时，矩阵把投影位置映射到同一区域的归一化 UV。**`u、v` 指向第一次写入的纹素位置；`z` 是当前表面点的参考深度，与纹理中保存的深度使用同一套编码。** 返回向量里的第四个分量 `0` 只是占位，并非第 1.2 节的齐次 `w`；这条方向光路径不再做齐次除法。
+
+### 1.4 手算：同是地板，为什么 P 在阴影里而 Q 不在？
+
+沿用图里的 **4×4 正交深度图**。设光从世界 `+Y` 向下照，横向覆盖世界 `X、Z` 的 `[0, 4]`，近面在 `Y = 10`，远面在 `Y = 0`。取 `+X` 和 `+Z` 为纹理 `u、v` 的正方向。假设方块和铺满视口的地板都参与投影，所以除了方块挡住的格，其他格存的都是地板深度。为便于手算，先用普通 Z（近 `0`、远 `1`），忽略 Bias 和过滤：
+
+```text
+世界点 (x, y, z_world) → (u, v, d) = (x / 4, z_world / 4, (10 - y) / 10)
+单格采样（本例 UV 在 [0,1) 内）：列 i = floor(u × 4)，行 j = floor(v × 4)
+```
+
+图表用 `[列, 行]` 标记纹素，对应 `depth[行][列]`。
+
+| 表面点 | 世界位置 `(x, y, z_world)` | 投影结果 `(u, v, d)` | 纹素 `[列, 行]` | 深度贴图中的值 |
+| --- | --- | --- | --- | --- |
+| 方块顶面 A | `(1.5, 7, 2.5)` | `(0.375, 0.625, 0.30)` | `[1, 2]` | `0.30`，来自 A |
+| 地板 P | `(1.5, 2, 2.5)` | `(0.375, 0.625, 0.80)` | `[1, 2]` | `0.30`，来自 A |
+| 地板 Q | `(2.5, 2, 2.5)` | `(0.625, 0.625, 0.80)` | `[2, 2]` | `0.80`，来自地板 |
+
+- **P：`0.80 > 0.30`。** 灯光沿同一个位置向下照，先遇到方块，后才到 P；P 被遮挡。
+- **Q：`0.80 == 0.80`。** 灯光在这条线上先遇到的就是 Q 所在的地板；Q 受光。
+
+这里的 `floor` 只用来说明单格查表。实际 URP 在 [`SampleShadowmap`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/ShaderLibrary/Shadows.hlsl#L269) 使用比较采样器。以 [D3D11 宏实现](../Library/PackageCache/com.unity.render-pipelines.core@14.0.12/ShaderLibrary/API/D3D11.hlsl#L136) 为例，`SAMPLE_TEXTURE2D_SHADOW` 展开后的关键调用是：
+
+```hlsl
+textureName.SampleCmpLevelZero(samplerName, (coord3).xy, (coord3).z)
+```
+
+`xy` 指定采样位置，`z` 交给采样器比较。返回的是**受光程度**，不是贴图中的 `0.30`：单次比较通过是 `1`，不通过是 `0`；带过滤时可以混合相邻位置的比较结果。灯的 Shadow Strength 再决定把遮挡结果乘进直接光之前削弱多少。比如强度只有 `0.75`，完全遮挡处的最终 `shadowAttenuation` 是 `0.25`。
+
+**反向 Z：** 若平台用反向 Z（近 `1`、远 `0`），例中的 `0.30` 和 `0.80` 分别变成 `0.70` 和 `0.20`。P 此时是 `0.20 < 0.70`，仍然更远、仍被挡住。实际 URP 会匹配写入和比较所用的深度方向，所以不要把手算里的 `>` 原样硬编码进去。
+
+### 1.5 开了级联或屏幕空间阴影，还这样查吗？
+
+- **级联阴影（Cascades）：** 近处和远处使用不同的灯光覆盖范围。URP 把各级深度图画进同一张二维大图（atlas）的不同小块；查询时，`ComputeCascadeIndex(positionWS)` 根据世界位置与各级包围球的关系选出级联，再用对应矩阵。该矩阵已经包含小块在 atlas 中的缩放与偏移，所以 `shadowCoord.xy` 指向整张大图中的位置。`z` 仍和该级写入的深度比较。
+- **屏幕空间阴影：** 启用对应 Renderer Feature 时，不透明物体的前向 Pass 用相机的屏幕 UV 查 `_ScreenSpaceShadowmapTexture`，那里存的是预先算好的阴影衰减。灯光的深度图仍要先生成，深度比较只是提前到了屏幕空间阴影 Pass。两张纹理存的值不同。
+
+**在 Unity 里观察：** 打开本章不透明物体的阴影场景，先保持一盏开实时阴影的方向光。为了和手算一致，可以用一个级联、关闭 Screen Space Shadows 和软阴影。打开 `Window > Analysis > Frame Debugger` 并启用，展开 `MainLightShadow` 看灯光视角的深度目标，再到 `DrawOpaqueObjects` 选地板的绘制，查看它绑定的主光阴影纹理。想验证因果，可以关掉方块的 Cast Shadows，重新捕获这一帧，观察方块不再写入深度目标、地板上对应阴影消失。参见 [Unity 的 Frame Debugger 对照截图](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/renderer-feature-screen-space-shadows.html)。
+
 ## 2. Shader 最外层代码在组织什么
 
 ### 2.1 `Properties`
@@ -226,17 +396,7 @@ o.worldNormal = NormalizeNormalPerVertex(normalInputs.normalWS);
 float4 shadowCoord = TransformWorldToShadowCoord(i.worldPos);
 ```
 
-相机正在着色的是世界空间点 `P`。要知道 `P` 是否被某个物体挡住，需要把 `P` 变换到主光阴影贴图所使用的坐标系，再用这个位置查询阴影贴图。
-
-概念上，查询会比较：
-
-```text
-阴影贴图记录的最近遮挡深度
-与
-当前表面点 P 到灯光的深度
-```
-
-如果 `P` 比阴影贴图中记录的遮挡物更远，说明灯光先撞到了别的表面，`P` 就处于阴影中。
+直接查深度图时，`shadowCoord.xy` 是主光阴影纹理的采样地址，`shadowCoord.z` 是当前片元在同一灯光投影下的参考深度。`TransformWorldToShadowCoord` 只生成坐标；`GetMainLight(shadowCoord)` 才用它做比较。两次绘制为什么能对上、屏幕空间变体有什么不同，见第 1 节的图和手算过程。
 
 ### 3.5 问题 2：`GetMainLight(shadowCoord)` 与不传参数有什么区别？
 
@@ -566,6 +726,11 @@ half4 frag(v2f i) : SV_Target
 
 ## 9. 官方资料与本地源码核对位置
 
+建议先看的图解与视频：
+
+- [LearnOpenGL 中文版：阴影映射](https://learnopengl-cn.github.io/05%20Advanced%20Lighting/03%20Shadows/01%20Shadow%20Mapping/)（[作者原文](https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping)）：先看开头光线与投影示意图，再看「深度贴图」「光空间的变换」「计算阴影」。原理通用；OpenGL 示例的坐标换算和普通纹理采样写法不能直接套进 URP。
+- [GAMES202 第 3 讲：实时阴影 1（中文视频）](https://www.bilibili.com/video/BV1YK4y1T7yY?p=3)（[课程主页与讲义](https://sites.cs.ucsb.edu/~lingqi/teaching/games202.html)）：先看 Shadow Mapping 两次绘制的部分；PCF、PCSS 可以在看懂基本比较后再看。
+
 官方文档：
 
 - [URP 14.0：在自定义 Shader 中使用阴影](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/use-built-in-shader-methods-shadows.html)
@@ -577,6 +742,7 @@ half4 frag(v2f i) : SV_Target
 项目中已安装的 URP 14.0.12 包源码：
 
 - [`GetMainLight` 与 `Light` 结构体](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/ShaderLibrary/RealtimeLights.hlsl)
-- [`ApplyShadowBias`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/ShaderLibrary/Shadows.hlsl)
+- [`TransformWorldToShadowCoord`、`SampleShadowmap` 和 `ApplyShadowBias`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/ShaderLibrary/Shadows.hlsl)
+- [主光阴影贴图的分配、绘制与全局绑定](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/Passes/MainLightShadowCasterPass.cs)
 - [URP 标准 `ShadowCaster` 实现](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Shaders/ShadowCasterPass.hlsl)
 - [C# 设置 `_LightDirection`、`_LightPosition` 与 `_ShadowBias`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/ShadowUtils.cs)
