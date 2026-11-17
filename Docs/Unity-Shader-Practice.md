@@ -30,3 +30,13 @@
 - `FallBack` 在没有合适的 `SubShader` 时提供备选 Shader。字符串匹配对方的 `Shader "..."` 声明名。比如 URP 14.0.12 的错误 Shader 声明名是 `Hidden/Universal Render Pipeline/FallbackError`，可在装好的 URP 包内打开 `Shaders/Utils/FallbackError.shader` 核对。
 
 借用 `ShadowCaster` 能让物体参与投影；物体自己是否接收实时阴影，由它的前向 Pass 决定。见[第 9 章阴影问答](Chapter09-Shadow-QA.md#35-问题-2getmainlightshadowcoord-与不传参数有什么区别)中的 `GetMainLight(shadowCoord)` 和衰减字段。
+
+## 旧管线的 Bumped Diffuse / Bumped Specular 需要自己重写成 URP Shader 吗？
+
+看目标是迁移材质效果，还是保留旧 Shader 的具体算法。[书里的 Bumped Diffuse](../Assets/Shaders/Common/BumpedDiffuse.shader) 用法线贴图改变每个像素参与光照计算的法线，输出环境光和漫反射；[Bumped Specular](../Assets/Shaders/Common/BumpedSpecular.shader) 还用同一条法线计算 Blinn–Phong 高光：法线越接近灯光方向与视线方向的半角向量，高光越强。两者都用 Built-in 的 `ForwardBase` / `ForwardAdd` Pass 标签，URP 14.0.12 的常规前向绘制不会按这两个标签执行它们。
+
+常规不透明材质可以改用 [URP Simple Lit](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/simple-lit-shader.html)：把主贴图和染色迁到 Base Map，把法线贴图迁到 Normal Map。Bumped Diffuse 关闭 Specular Highlights；Bumped Specular 开启它，再按原来的 `_Specular` 设置高光颜色。旧 Shader 直接用 `_Gloss` 当高光指数；Simple Lit 从 Smoothness 算指数 `exp2(10 * smoothness + 1)`。如果只想对齐指数，用 `(log2(Gloss) - 1) / 10` 作为常量 Smoothness 的起点，再对照场景调整。
+
+光照结果不保证完全一致；这个版本的 Simple Lit 还共用 Base Map 和 Normal Map 的 UV 缩放和偏移，旧 Shader 则可以分别设置。需要保留特定公式或独立 UV 时，再考虑移植自定义实现。
+
+URP 14.0.12 的材质转换器按 Shader 声明名匹配，内置规则会把 `Legacy Shaders/Bumped Diffuse` 和 `Legacy Shaders/Bumped Specular` 转成 Simple Lit，并迁移 `_MainTex` 和 `_Color`。本项目的两个 Shader 使用 `Unity Shaders Book/Common/` 前缀，不会匹配这些规则；切换后要核对贴图、染色、Tiling/Offset 和高光设置。

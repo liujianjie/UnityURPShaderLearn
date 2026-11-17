@@ -5,9 +5,18 @@ Shader "Unity Shaders Book/Chapter 10/Mirror" {
     }
     SubShader
     {
-		Tags { "RenderType"="Opaque" "Queue"="Geometry"}
+		Tags { 
+            "RenderPipeline"="UniversalPipeline"
+            "RenderType"="Opaque" 
+            "Queue"="Geometry"
+		}
         Pass{
-            CGPROGRAM
+			Tags {"Lighting"="UniversalForward"}
+			
+            HLSLPROGRAM
+ 
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             #pragma vertex vert
             #pragma fragment frag
@@ -16,7 +25,7 @@ Shader "Unity Shaders Book/Chapter 10/Mirror" {
 
             struct a2v{
                 float4 vertex : POSITION;
-                float3 texcoord : TEXCOORD0;
+                float2 texcoord : TEXCOORD0;
             };
             struct v2f{
                 float4 pos : SV_POSITION;
@@ -26,19 +35,19 @@ Shader "Unity Shaders Book/Chapter 10/Mirror" {
             v2f vert(a2v v)
             {
                 v2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);     // 顶点位置
+                o.pos = TransformObjectToHClip(v.vertex);     // 顶点位置
 
                 o.uv = v.texcoord;
                 o.uv.x = 1 - o.uv.x;	// 镜子需要翻转 x
                 //o.uv.x = 1 - o.uv.x;	// 镜子需要翻转 x
                 return o;
             }
-            fixed4 frag(v2f i) : SV_TARGET{
+            half4 frag(v2f i) : SV_TARGET{
                 return tex2D(_MainTex, i.uv);
             }
-            ENDCG
-        }
-    }
- 	FallBack Off
+            ENDHLSL
+		}
+	} 
+ 	FallBack "Packages/com.unity.render-pipelines.universal/FallbackError"
 }
 

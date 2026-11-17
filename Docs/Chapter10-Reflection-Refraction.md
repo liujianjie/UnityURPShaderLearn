@@ -57,3 +57,9 @@ half3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
 本章的 Reflection、Refraction 和 Fresnel Shader 都借用了 Lit 的 `ShadowCaster`。但在当前前向 Pass 中，`ambient + lerp(...) * atten` 的 `atten` 只取了 `mainLight.distanceAttenuation`。本章在 URP 14.0.12 的非 Forward+ 分支中，这个主光字段来自 `unity_LightData.z`，表示主光的剔除结果（`0` 或 `1`）；它没有包含阴影贴图的遮挡。
 
 若要给本章 Shader 接上主光实时阴影，需要同时检查两个环节：Pass 是否编译并选中对应的主光阴影变体，以及希望受阴影影响的颜色项是否使用了 `mainLight.shadowAttenuation`。参考[第 9 章的完整阴影路径](Chapter09-Shadow-QA.md#35-问题-2getmainlightshadowcoord-与不传参数有什么区别)。声明 Pass 与备选 Shader 名的区别见 [`UsePass` 与 `FallBack`](Unity-Shader-Practice.md#usepass-fallback)。
+
+## 镜子 Shader 的 `2D` 就是摄像机输出吗？
+
+[镜子 Shader](../Assets/Shaders/Chapter10/Chapter10-Mirror.shader) 中的 `_MainTex("Main Tex", 2D) = "white"{}` 声明了一个二维纹理槽；`Main Tex` 是 Inspector 显示名，`_MainTex` 是代码读取的属性名。纹理的来源由材质绑定决定，同一个槽也能放普通二维图片。
+
+在[镜子场景](../Assets/Scenes/Chapter10/Scene_10_2_1镜子效果.unity)，名为 `Camera` 的相机把 [`MirrorTexture`](../Assets/Textures/Chapter10/MirrorTexture.renderTexture) 设为 [`targetTexture`](https://docs.unity3d.com/2022.3/Documentation/ScriptReference/Camera-targetTexture.html)，渲染时往里面写画面。镜面使用的 [`MirrorMat`](../Assets/Materials/Chapter10/MirrorMat.mat) 又把同一个资源绑定给 `_MainTex`。Shader 把镜面网格的 UV 水平翻转，再用 `tex2D(_MainTex, i.uv)` 读相应颜色。这个场景的 `Main Camera` 没有指定输出纹理，负责把含镜面的场景画到屏幕。
