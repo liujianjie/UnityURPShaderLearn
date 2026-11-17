@@ -33,22 +33,27 @@ half3 color = ambient + lerp(diffuse, refraction, _RefractAmount) * atten;
 这里看到的是沿折射方向从**环境 Cubemap** 取来的颜色。Shader 没有读取球后当前相机渲染的物体。
 
 <a id="chapter10-fresnel"></a>
-## `_FresnelScale` 为何会影响球体正面的倒影？
+## `_FresnelScale` 控制什么？视线贴着表面时会看见什么？
 
-[本章 Fresnel Shader 的片元函数](../Assets/Shaders/Chapter10/Chapter10-Fresnel.shader#L56) 先归一化世界空间法线 `worldNormal` 和指向相机的方向 `worldViewDir`，然后用算出的权重混合漫反射和从 Cubemap 取到的环境倒影：
+[本章 Fresnel Shader](../Assets/Shaders/Chapter10/Chapter10-Fresnel.shader#L66) 将从表面点指向相机的方向归一化，然后和插值后的世界法线做点积。算出的权重用来混合漫反射和从 Cubemap 取到的环境倒影：
 
 ```hlsl
-fixed fresnel = _FresnelScale + (1 - _FresnelScale) * pow(1 - dot(worldViewDir, worldNormal), 5);
+half3 viewDir = normalize(i.worldViewDir);
+half fresnel = _FresnelScale + (1 - _FresnelScale) * pow(1 - dot(viewDir, i.worldNormal), 5);
 // ……
-fixed3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
+half3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
 ```
 
-正看时，点积接近 `1`，`fresnel` 就接近 `_FresnelScale`；靠近球的轮廓时，点积接近 `0`，`fresnel` 就趋近 `1`。因此这里的参数实际是**正面反射权重**。取 `1` 时，整个 `lerp` 恒选 `reflection`，反射权重就不再随角度变化。5 次方和 `0.04` 的出处见[菲涅尔效应与 Schlick 近似](Graphics-Fundamentals.md#fresnel-schlick)。
+角度取决于**该点的视线和物体表面**。正看时，视线沿着法线，点积接近 `1`，所以 `_FresnelScale` 是正面的基础反射权重；贴着表面看时，视线垂直于法线，点积接近 `0`，反射权重趋近 `1`。如果物体表面平行于相机的成像平面，画面中央的视线反而近似垂直撞上物体表面，接近正看。5 次方和 `0.04` 的出处见[菲涅尔效应与 Schlick 近似](Graphics-Fundamentals.md#fresnel-schlick)。
 
-[Shader 声明的默认值](../Assets/Shaders/Chapter10/Chapter10-Fresnel.shader#L5) 是 `1`，而仓库里的 [FresnelMat 材质](../Assets/Materials/Chapter10/FresnelMat.mat#L69) 保存的是 `0`。对照时可固定 Cubemap，只把该材质的 **Fresnel Scale** 改成 `0.04` 或 `1`：前者让正面也混入少量倒影，同时保留轮廓与正面的反射权重差；后者让两处都完全选用倒影颜色参与后续光照计算。
+掠射时，颜色趋近 `ambient + reflection * atten`。这让环境倒影的权重变大，明暗取决于反射方向对应的 Cubemap 颜色。球面上这种角度主要出现在轮廓附近；同一材质用在 `Plane` 上，降低相机、从正面贴着平面看时，大片可见区域都可能以倒影为主。再贴近共面时，平面也会因透视投影变薄。
+
+[Shader 声明的默认值](../Assets/Shaders/Chapter10/Chapter10-Fresnel.shader#L5) 是 `1`，取这个值时整个 `lerp` 恒选 `reflection`，反射权重不再随角度变化。对照时可固定 Cubemap，把 [FresnelMat 材质](../Assets/Materials/Chapter10/FresnelMat.mat) 的 **Fresnel Scale** 在 `0.04` 和 `1` 之间切换，看球的正面和轮廓，或将相机从俯视移到接近 `Plane` 的高度。
+
+当前 Shader 只归一化了 `viewDir`。球面上的 `i.worldNormal` 是[插值后的法线](Graphics-Fundamentals.md#interpolated-normal)，长度不一定为 `1`，点积会掺入长度的影响。计算时可先在片元用 `N = normalize(i.worldNormal)`，再用 `saturate(dot(viewDir, N))` 作为角度项；漫反射和 `SampleSH` 也可共用这个单位法线。`Plane` 各顶点法线相同，通常不受插值缩短的影响。
 
 ## 为什么会投影到地面，本章球体却未必接收阴影？
 
-这两份 Shader 都借用了 Lit 的 `ShadowCaster`。但在当前前向 Pass 中，`ambient + lerp(...) * atten` 的 `atten` 只取了 `mainLight.distanceAttenuation`。本章在 URP 14.0.12 的非 Forward+ 分支中，这个主光字段来自 `unity_LightData.z`，表示主光的剔除结果（`0` 或 `1`）；它没有包含阴影贴图的遮挡。
+本章的 Reflection、Refraction 和 Fresnel Shader 都借用了 Lit 的 `ShadowCaster`。但在当前前向 Pass 中，`ambient + lerp(...) * atten` 的 `atten` 只取了 `mainLight.distanceAttenuation`。本章在 URP 14.0.12 的非 Forward+ 分支中，这个主光字段来自 `unity_LightData.z`，表示主光的剔除结果（`0` 或 `1`）；它没有包含阴影贴图的遮挡。
 
 若要给本章 Shader 接上主光实时阴影，需要同时检查两个环节：Pass 是否编译并选中对应的主光阴影变体，以及希望受阴影影响的颜色项是否使用了 `mainLight.shadowAttenuation`。参考[第 9 章的完整阴影路径](Chapter09-Shadow-QA.md#35-问题-2getmainlightshadowcoord-与不传参数有什么区别)。声明 Pass 与备选 Shader 名的区别见 [`UsePass` 与 `FallBack`](Unity-Shader-Practice.md#usepass-fallback)。
