@@ -32,6 +32,21 @@ half3 color = ambient + lerp(diffuse, refraction, _RefractAmount) * atten;
 
 这里看到的是沿折射方向从**环境 Cubemap** 取来的颜色。Shader 没有读取球后当前相机渲染的物体。
 
+<a id="chapter10-fresnel"></a>
+## `_FresnelScale` 为何会影响球体正面的倒影？
+
+[本章 Fresnel Shader 的片元函数](../Assets/Shaders/Chapter10/Chapter10-Fresnel.shader#L56) 先归一化世界空间法线 `worldNormal` 和指向相机的方向 `worldViewDir`，然后用算出的权重混合漫反射和从 Cubemap 取到的环境倒影：
+
+```hlsl
+fixed fresnel = _FresnelScale + (1 - _FresnelScale) * pow(1 - dot(worldViewDir, worldNormal), 5);
+// ……
+fixed3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
+```
+
+正看时，点积接近 `1`，`fresnel` 就接近 `_FresnelScale`；靠近球的轮廓时，点积接近 `0`，`fresnel` 就趋近 `1`。因此这里的参数实际是**正面反射权重**。取 `1` 时，整个 `lerp` 恒选 `reflection`，反射权重就不再随角度变化。5 次方和 `0.04` 的出处见[菲涅尔效应与 Schlick 近似](Graphics-Fundamentals.md#fresnel-schlick)。
+
+[Shader 声明的默认值](../Assets/Shaders/Chapter10/Chapter10-Fresnel.shader#L5) 是 `1`，而仓库里的 [FresnelMat 材质](../Assets/Materials/Chapter10/FresnelMat.mat#L69) 保存的是 `0`。对照时可固定 Cubemap，只把该材质的 **Fresnel Scale** 改成 `0.04` 或 `1`：前者让正面也混入少量倒影，同时保留轮廓与正面的反射权重差；后者让两处都完全选用倒影颜色参与后续光照计算。
+
 ## 为什么会投影到地面，本章球体却未必接收阴影？
 
 这两份 Shader 都借用了 Lit 的 `ShadowCaster`。但在当前前向 Pass 中，`ambient + lerp(...) * atten` 的 `atten` 只取了 `mainLight.distanceAttenuation`。本章在 URP 14.0.12 的非 Forward+ 分支中，这个主光字段来自 `unity_LightData.z`，表示主光的剔除结果（`0` 或 `1`）；它没有包含阴影贴图的遮挡。
