@@ -10,29 +10,32 @@ Shader "Unity Shaders Book/Chapter 10/Glass Refraction" {
     SubShader
     {
         // Transparent 不透明的物体必须先得绘制完
-		Tags { "Queue"="Transparent" "RenderType"="Opaque" }
-
-        // 这个pass 将会抓取屏幕纹理，在物体渲染到texture之后
-        // 我们可以获取这个屏幕纹理 在下一个pass访问名称_RefractionText
-		GrabPass { "_RefractionTex" }
+		Tags { 
+            "RenderPipeline"="UniversalPipeline"
+            "Queue"="Transparent" 
+            "RenderType"="Opaque" 
+        }
 
         Pass{
-            CGPROGRAM
+			HLSLPROGRAM
+ 
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareOpaqueTexture.hlsl"
 
             #pragma vertex vert
             #pragma fragment frag
 
-			#include "UnityCg.cginc"
 
+            CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
+                float4 _BumpMap_ST;
+                float _Distortion;
+                half _RefractAmount;
+            CBUFFER_END
+			
             sampler2D _MainTex;
-            float4 _MainTex_ST;
             sampler2D _BumpMap;
-            float4 _BumpMap_ST;
             samplerCUBE _Cubemap;
-            float _Distortion;
-            fixed _RefractAmount;
-            sampler2D _RefractionTex;           // 对应grabpss时指定的纹理名称
-            float4 _RefractionTex_TexelSize;    // 得到grabpss时的纹素大小 256 * 512=>纹素大小(1/256, 1/512)
 
             struct a2v{
                 float4 vertex : POSITION;
@@ -43,27 +46,27 @@ Shader "Unity Shaders Book/Chapter 10/Glass Refraction" {
 
             struct v2f{
                 float4 pos :SV_POSITION;
-                float4 scrPos : TEXCOORD0;
-                float4 uv : TEXCOORD1;
-                float4 TtoW0 : TEXCOORD2;
-                float4 TtoW1 : TEXCOORD3;
-                float4 TtoW2 : TEXCOORD4;
+                float4 uv : TEXCOORD0;
+                float4 TtoW0 : TEXCOORD1;
+                float4 TtoW1 : TEXCOORD2;
+                float4 TtoW2 : TEXCOORD3;
             };
 
             v2f vert(a2v v)
             {
-                v2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);     // 顶点位置
-                // 得到被抓取的屏幕图像的采样坐标
-                o.scrPos = ComputeGrabScreenPos(o.pos);
+				v2f o;
+				VertexPositionInputs posInputs = GetVertexPositionInputs(v.vertex.xyz);
+                o.pos = posInputs.positionCS;                       // 裁剪空间 顶点位置
+
                 // 传递uv
                 o.uv.xy = TRANSFORM_TEX(v.texcoord, _MainTex);
                 o.uv.zw = TRANSFORM_TEX(v.texcoord, _BumpMap);
 
-                float3 worldPos =  mul(unity_ObjectToWorld, v.vertex).xyz;    // 世界空间位置
-                fixed3 worldNormal = UnityObjectToWorldNormal(v.normal); // 世界空间法线
-                fixed3 worldTangent = UnityObjectToWorldDir(v.tangent.xyz); // 世界空间切线
-                fixed3 worldBinormal = cross(worldNormal, worldTangent) * v.tangent.w; // 世界空间副法线)
+                VertexNormalInputs normalInputs = GetVertexNormalInputs(v.normal, v.tangent);
+                float3 worldPos =  posInputs.positionWS;                                // 世界空间位置
+                half3 worldNormal = normalInputs.normalWS;                              // 世界空间法线
+                half3 worldTangent = normalInputs.tangentWS;                            // 世界空间切线
+                half3 worldBinormal = normalInputs.bitangentWS;                         // 世界空间副法线)
 
                 // 得到从切线空间到世界空间的转换矩阵
                 o.TtoW0 = float4(worldTangent.x, worldBinormal.x, worldNormal.x, worldPos.x);
@@ -71,38 +74,36 @@ Shader "Unity Shaders Book/Chapter 10/Glass Refraction" {
                 o.TtoW2 = float4(worldTangent.z, worldBinormal.z, worldNormal.z, worldPos.z);
                 return o;
             }
-            fixed4 frag(v2f i) : SV_TARGET{
+            half4 frag(v2f i) : SV_TARGET{
                 float3 worldPos = float3(i.TtoW0.w, i.TtoW1.w, i.TtoW2.w);
-                fixed3 worldViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
+                half3 worldViewDir = normalize(_WorldSpaceCameraPos.xyz - worldPos);
 
                 // 获取切线空间下的法线
-                fixed3 bump = UnpackNormal(tex2D(_BumpMap, i.uv.zw));
+                half3 bump = UnpackNormal(tex2D(_BumpMap, i.uv.zw));
 
-                // 获取切线空间下的偏移
-                float2 offset = bump.xy * _Distortion * _RefractionTex_TexelSize.xy;
-                // 屏幕图像的采样坐标进行偏移，模拟折射效果。 （切线空间下的法线方向来进行偏移。法线方向：i.scrPos.z？)
-                i.scrPos.xy = offset * i.scrPos.z + i.scrPos.xy;
-
-                // 对scrPos透视除法得到真正的屏幕坐标 并采样
-                fixed3 refrCol = tex2D(_RefractionTex, i.scrPos.xy / i.scrPos.w).rgb;
+                // 片元的 SV_POSITION 是像素位置；把以渲染像素为单位的偏移换算成 UV。
+                float2 screenUV = GetNormalizedScreenSpaceUV(i.pos);
+                float2 offsetUV = bump.xy * _Distortion / GetScaledScreenParams().xy;
+                // URP 在绘制透明物体前复制不透明画面，玻璃相机需启用 Opaque Texture。
+                half3 refrCol = SampleSceneColor(screenUV + offsetUV);
 
                 // 转换切线空间的法线到世界空间
                 // 将法线从切线到世界。就是3x3的矩阵乘以3x1的向量：矩阵的每一行与向量的点乘
                 bump = normalize(half3(dot(i.TtoW0.xyz, bump), dot(i.TtoW1.xyz, bump), dot(i.TtoW2.xyz, bump)));
-                fixed3 reflDir = reflect(-worldViewDir, bump);
-                fixed4 texColor = tex2D(_MainTex, i.uv.xy);
+                half3 reflDir = reflect(-worldViewDir, bump);
+                half4 texColor = tex2D(_MainTex, i.uv.xy);
 
                 // 从立方体贴图中获取反射颜色
-                fixed3 reflCol = texCUBE(_Cubemap, reflDir).rgb * texColor.rgb;
+                half3 reflCol = texCUBE(_Cubemap, reflDir).rgb * texColor.rgb;
 
                 // 反射(cubemap） * 系数 + 折射（屏幕纹理）+系数 
-                fixed3 finalColor = reflCol * (1-_RefractAmount) + refrCol * _RefractAmount;
+                half3 finalColor = reflCol * (1-_RefractAmount) + refrCol * _RefractAmount;
 
-                return fixed4(finalColor, 1.0);
+                return half4(finalColor, 1.0);
             }
-            ENDCG
+            ENDHLSL
         }
-    }
-	FallBack "Diffuse"
+	} 
+    FallBack "Hidden/Universal Render Pipeline/FallbackError"
 }
 

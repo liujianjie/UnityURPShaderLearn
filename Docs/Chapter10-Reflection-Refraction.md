@@ -1,6 +1,6 @@
 # Chapter 10：环境反射与折射
 
-对应 [Reflection Shader](../Assets/Shaders/Chapter10/Chapter10-Reflection.shader) 和 [Refraction Shader](../Assets/Shaders/Chapter10/Chapter10-Refraction.shader)。以下用本章代码说明方向、取样和混色怎样接起来。
+对应 [Reflection Shader](../Assets/Shaders/Chapter10/Chapter10-Reflection.shader)、[Refraction Shader](../Assets/Shaders/Chapter10/Chapter10-Refraction.shader) 和 [Glass Refraction Shader](../Assets/Shaders/Chapter10/Chapter10-GlassRefraction.shader)。以下用本章代码说明方向、取样和混色怎样接起来。
 
 ## `TEXTURECUBE`、`SAMPLER` 和 `SAMPLE_TEXTURECUBE` 各做什么？
 
@@ -63,3 +63,25 @@ half3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
 [镜子 Shader](../Assets/Shaders/Chapter10/Chapter10-Mirror.shader) 中的 `_MainTex("Main Tex", 2D) = "white"{}` 声明了一个二维纹理槽；`Main Tex` 是 Inspector 显示名，`_MainTex` 是代码读取的属性名。纹理的来源由材质绑定决定，同一个槽也能放普通二维图片。
 
 在[镜子场景](../Assets/Scenes/Chapter10/Scene_10_2_1镜子效果.unity)，名为 `Camera` 的相机把 [`MirrorTexture`](../Assets/Textures/Chapter10/MirrorTexture.renderTexture) 设为 [`targetTexture`](https://docs.unity3d.com/2022.3/Documentation/ScriptReference/Camera-targetTexture.html)，渲染时往里面写画面。镜面使用的 [`MirrorMat`](../Assets/Materials/Chapter10/MirrorMat.mat) 又把同一个资源绑定给 `_MainTex`。Shader 把镜面网格的 UV 水平翻转，再用 `tex2D(_MainTex, i.uv)` 读相应颜色。这个场景的 `Main Camera` 没有指定输出纹理，负责把含镜面的场景画到屏幕。
+
+<a id="glass-refraction"></a>
+## 玻璃怎样同时显示被扭曲的背景和环境倒影？
+
+[玻璃 Shader](../Assets/Shaders/Chapter10/Chapter10-GlassRefraction.shader#L60) 给每个片元合成两份颜色：从先前拍下的背景画面偏移取样，形成折射观感；用表面法线算反射方向，再从 Cubemap 取环境倒影。两条路径共用法线贴图，但用它的方式不同。
+
+先只看屏幕上的一个玻璃像素：假设背景图同一格是红色，右边一格是蓝色。如果这处玻璃的偏移恰好向右一格，Shader 就去右边读蓝色，把它写回原来那个玻璃像素。玻璃网格没动，背景图也没改，每个玻璃像素只是去不同的地方取色。一条红蓝分界线如果每行都偏相同距离，只会整体平移；法线贴图让每行的偏移可以不一样，直线才会弯。倒影是另一份颜色：从这个像素的表面朝向算出反射方向，到环境图里取色，再与刚读到的蓝色混合。
+
+因此有两组容易混淆的 UV：`i.uv.zw` 来自玻璃网格的 UV，回答「这是玻璃贴图上的哪个位置，箭头朝哪边」；`screenUV` 来自片元的屏幕位置，回答「这个玻璃像素在背景图上本来该读哪一格」。前者取出一个方向，后者加上偏移再取出颜色。
+
+1. **确定玻璃画在哪，以及该去背景图的哪一格。** 顶点输出的 `o.pos = posInputs.positionCS` 是[齐次裁剪坐标](Graphics-Fundamentals.md#homogeneous-clip-space)，交给 GPU 用于裁剪和光栅化。到片元时，同一个 `SV_POSITION` 语义的 `i.pos.xy` 已是像素位置；`GetNormalizedScreenSpaceUV(i.pos)` 把它换成未偏移的背景 UV。不再需要以前用 `ComputeScreenPos` 传递的额外坐标和手动除以 `w`。
+2. **让背景图案看起来被玻璃扭弯。** `UnpackNormal` 从 `_BumpMap` 解出切线空间法线。`bump.xy * _Distortion` 给出以渲染像素计的偏移，除以 `GetScaledScreenParams().xy` 换算成 UV，然后用 `SampleSceneColor` 读相机背景。比如渲染宽度是 960，横向偏 12 个像素就是加上 `12 / 960`。玻璃片元的位置不变，只改变读取位置。这是屏幕取样近似；现在的偏移不再乘旧版的投影深度因子 `scrPos.z / scrPos.w`。
+3. **让倒影随局部法线偏转。** 顶点调用 `GetVertexNormalInputs` 获取世界空间的 `T、B、N`。URP 14.0.12 以 `cross(N, T) * tangentOS.w * GetOddNegativeScale()` 得到 `B`，乘号后的因素用于保留切线基底的朝向，处理镜像 UV 和奇数个负缩放。Shader 把[切线转世界矩阵](Graphics-Fundamentals.md#tangent-frame)的三行放在 `TtoW0/1/2.xyz`，用每行与原切线空间法线的点积得到世界法线的一个分量，最后归一化。三个 `.w` 只是顺手装入的世界位置 `x/y/z`，用于求从片元指向相机的方向 `V`；它们不参与法线变换。用 `reflect(-V, N_ws)` 得到朝向环境的方向，采样 `_Cubemap`，再乘 `_MainTex.rgb` 给倒影上色。
+4. **把两份 RGB 合成。** `_RefractAmount = 0` 只显示倒影，`1` 只显示背景取样，中间值线性混合。本例没有按视角算菲涅尔权重。片元返回 `alpha = 1`，透过玻璃的观感来自手动读入背景颜色。透明队列用于安排绘制时间，不会自动抓取背景。
+
+### 迁移到 URP 时，玻璃为什么一度看不到里面的球？
+
+迁移期间，原来的 `GrabPass` 已注释，Shader 还在读默认是白图的 `_RefractionTex`，[玻璃材质](../Assets/Materials/Chapter10/GlassRefractionMat.mat) 也没有给这个槽绑定相机画面。因此折射分支在纯白背景上移动取样坐标，读不出球或墙的轮廓。能看到 Cubemap 倒影，只能说明反射分支有数据。
+
+项目已在主相机的 Rendering → Opaque Texture 设为 On，并让 [Shader](../Assets/Shaders/Chapter10/Chapter10-GlassRefraction.shader#L85) 用 `SampleSceneColor` 读取 `_CameraOpaqueTexture`。这两处分别负责生成和读取画面；只打开相机开关不会填充旧的 `_RefractionTex` 槽。[Opaque Texture](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/universalrp-asset.html#rendering) 是绘制透明物体前的快照，所以本场景的不透明球会被拍进去。在 Game 窗口验证；Scene 窗口使用编辑器相机，它在 URP 14.0.12 中读取 [URP-HighFidelity](../Assets/Settings/URP-HighFidelity.asset#L23) 的全局选项。
+
+验证顺序：先在 Frame Debugger 里确认玻璃前有 `CopyColor`，再设 Amount = `1`、Distortion = `0`，看没扭曲时能否透过立方体看见球；能看到后再加 Distortion。最后设 Amount = `0`，单独检查 Cubemap 倒影。这个顺序先验证纹理来源，再验证 UV 偏移。
