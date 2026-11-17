@@ -679,6 +679,12 @@ half4 frag(v2f i) : SV_Target
 
 “投射阴影”和“接收阴影”是两件事：前者由 `ShadowCaster` 提供深度，后者由可见颜色 Pass 查询并应用深度比较结果。
 
+### 6.1 第二个 Pass 的阴影贴图怎么交给第一个 Pass？
+
+在 URP `14.0.12` 中，主光阴影阶段先用 [`ConfigureTarget(m_MainLightShadowmapTexture)`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/Passes/MainLightShadowCasterPass.cs#L181) 指定深度目标，再调用各投影物体的 `ShadowCaster` Pass。绘制完成后，[`SetGlobalTexture`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/Runtime/Passes/MainLightShadowCasterPass.cs#L197) 把同一张纹理绑定到全局名称 `_MainLightShadowmapTexture`，供之后的 Shader 读取。两个 Pass 共用的是 URP 绑定的 GPU 纹理，第二个 Pass 的 `frag` 返回值不参与传递。
+
+第一个 Pass 通过 `Lighting.hlsl` → `RealtimeLights.hlsl` → `Shadows.hlsl` 拿到纹理的声明和采样函数。[`GetMainLight(shadowCoord)`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/ShaderLibrary/RealtimeLights.hlsl#L118) 调用 `MainLightRealtimeShadow`；普通和级联阴影在[这里把 `_MainLightShadowmapTexture` 传给 `SampleShadowmap`](../Library/PackageCache/com.unity.render-pipelines.universal@14.0.12/ShaderLibrary/Shadows.hlsl#L335)。比较结果存进 `Light.shadowAttenuation`，[本章 Shader](../Assets/Shaders/Chapter9/Chapter9-Shadow.shader#L120) 用它衰减主光的漫反射和高光。屏幕空间变体读的是由主光深度图预先算出的衰减，见第 1.5 节。
+
 ## 7. 从上到下快速阅读整份 Shader
 
 | 代码位置 | 一句话含义 |

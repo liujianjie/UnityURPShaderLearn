@@ -24,7 +24,7 @@ Shader "Unity Shaders Book/Chapter 9/Shadow" {
 		// HLSLINCLUDE 中的内容会被下面两个 Pass 共同看见，避免重复声明结构体和材质参数。
 		HLSLINCLUDE
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-			// Lighting.hlsl 还会间接引入实时光源和阴影相关函数，例如 GetMainLight。
+			// Lighting.hlsl 引入 RealtimeLights.hlsl，后者再引入 Shadows.hlsl（声明主光阴影贴图）。
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
 			// URP 的 SRP Batcher 要求材质常量放在同一个 UnityPerMaterial CBUFFER 中，
@@ -92,13 +92,14 @@ Shader "Unity Shaders Book/Chapter 9/Shadow" {
 
 			half4 frag(v2f i) : SV_Target
 			{
-				// 把当前表面点的世界坐标变换到主光阴影贴图空间，供阴影贴图比较使用。
+				// 普通/级联阴影：xy 定位阴影贴图，z 是当前表面点要参与比较的深度。这里只算坐标。
+				// 屏幕空间阴影变体改用屏幕坐标，后续读取的是 URP 已算好的阴影衰减。
 				float4 shadowCoord = TransformWorldToShadowCoord(i.worldPos);
 
-				// 无参 GetMainLight() 只填充方向、颜色、距离衰减等基础光源数据，
-				// 这个重载先取得同一份数据，再用 shadowCoord 填充 shadowAttenuation。
-				// 它不是 TRANSFER_SHADOW：后者是 Built-in 管线中“生成并传递阴影坐标”的宏。
-				Light mainLight = GetMainLight(shadowCoord);
+				// 读取阴影的位置：GetMainLight(shadowCoord) 内部调用 MainLightRealtimeShadow。
+				// 普通/级联阴影在 Shadows.hlsl 的该函数中采样 _MainLightShadowmapTexture，
+				// 把深度比较得到的衰减写入 Light.shadowAttenuation。无参 GetMainLight() 不查阴影。
+				Light mainLight = GetMainLight(shadowCoord);			// 利用了第二个pass输出的阴影贴图
 
 				// 插值后的法线长度可能不再恰好为 1，因此在逐像素计算前再归一化。
 				half3 worldNormal = NormalizeNormalPerPixel(i.worldNormal);
@@ -115,8 +116,8 @@ Shader "Unity Shaders Book/Chapter 9/Shadow" {
 				// 环境光通常不乘实时阴影，否则阴影区会失去间接光而过黑。
 				half3 ambient = half3(unity_SHAr.w, unity_SHAg.w, unity_SHAb.w);
 
-				// 直接光同时受距离/剔除衰减和阴影衰减影响。
-				// shadowAttenuation：1 表示未被遮挡，0 表示完全处于阴影，软阴影时可为中间值。
+				// 使用阴影的位置：衰减只乘主光的漫反射和高光，ambient 直接相加。
+				// shadowAttenuation 越小，主光越暗；软阴影过滤或较低的阴影强度可产生中间值。
 				half attenuation = mainLight.distanceAttenuation * mainLight.shadowAttenuation;
 				half3 color = ambient + (diffuse + specular) * attenuation;
 
@@ -144,13 +145,15 @@ Shader "Unity Shaders Book/Chapter 9/Shadow" {
 
 		Pass
 		{
-			// 第二个 Pass：从灯光视角把物体深度写入阴影贴图，不负责屏幕颜色。
-			// URP 的阴影绘制阶段只查找 LightMode = ShadowCaster 的 Pass。
+			// URP 先执行阴影绘制，再执行相机的 UniversalForward；Shader 中的书写顺序不决定执行顺序。
+			// 主光阴影阶段把深度纹理设为绘制目标，再用 ShadowCaster 绘制各投影物体。
+			// 绘制完成后，MainLightShadowCasterPass.cs 用 SetGlobalTexture 将同一张纹理绑定为
+			// _MainLightShadowmapTexture，供第一个 Pass 在普通/级联阴影下查询。
 			Tags{"LightMode" = "ShadowCaster"}
 
 			// 双面都投射阴影，适合纸片/栅栏等薄片模型；封闭模型通常也可改回 Cull Back。
 			Cull Off
-			// 阴影贴图本质上主要保存深度，因此开启深度写入和深度测试。
+			// ZTest 通过时，ZWrite 让 GPU 将光栅化得到的灯光视角深度写入阴影贴图。
 			ZWrite On
 			ZTest LEqual
 
@@ -194,7 +197,7 @@ Shader "Unity Shaders Book/Chapter 9/Shadow" {
 
 			half4 frag(v2f i) : SV_Target
 			{
-				// ShadowCaster 的目标是写深度，返回的颜色通常不会被使用。
+				// return 0 是颜色输出；阴影贴图里的深度来自顶点输出 o.pos 的光栅化结果。
 				// 片元函数仍然存在，是为了在需要时执行透明度 clip()、LOD 淡出等逐片元丢弃逻辑。
 				return 0;
 			}
