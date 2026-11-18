@@ -14,7 +14,7 @@ Codex 在本仓库回答学习问题时，会依据 [自动整理规则](../AGEN
 ## 章节索引
 
 - [Chapter 9：前向渲染、光照方向与材质常量缓冲区](Chapter09-ForwardRendering.md)
-- [Chapter 9：URP 阴影 Shader 问答](Chapter09-Shadow-QA.md)
+- [Chapter 9：URP 阴影 Shader 问答](Chapter09-Shadow-QA.md) · [灯光矩阵第一行推导](Chapter09-Shadow-QA.md#view-first-row)
 - [Chapter 10：环境反射与折射](Chapter10-Reflection-Refraction.md)
 
 ## 我的理解

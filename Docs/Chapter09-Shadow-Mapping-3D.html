@@ -7,26 +7,45 @@
 :root{color-scheme:dark;--bg:#101719;--panel:#131f22;--ink:#eff4ed;--sub:#aab9b7;--rule:#354548;--gold:#f5c674;--mint:#75ddcc;--mono:Consolas,'Courier New',monospace;--sans:'Microsoft YaHei UI','PingFang SC','Noto Sans CJK SC',sans-serif}
 *{box-sizing:border-box}
 body{margin:0;color:var(--ink);font:15px/1.65 var(--sans);background:radial-gradient(ellipse at 25% -28%,#273a37,transparent 65%),var(--bg)}
-main{max-width:1320px;padding:clamp(18px,4vw,55px);margin:auto}
+main{max-width:1450px;padding:clamp(14px,3.4vw,48px);margin:auto}
 .eyebrow,.tag,.space,.step small,.values dt,.formula,.scene-tag,.legend,.chip,output{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .eyebrow{margin:0 0 8px;color:var(--mint);font-size:12px;letter-spacing:.18em}
 header h1{font-family:'Songti SC','SimSun',Georgia,serif;letter-spacing:.04em;font-weight:600;font-size:clamp(34px,6vw,62px);line-height:1.12;margin:0 0 11px}
 header p{margin:0;max-width:66ch;color:var(--sub)}
-.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:26px 0 12px}
+.pass-flow{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px 16px;margin:18px 0;color:var(--sub);font-size:14px}
+.pass-flow p{margin:0;padding:8px 12px;border-left:2px solid var(--gold);background:#202723}
+.pass-flow p:last-child{border-color:var(--mint);background:#192c2b}
+.pass-flow strong{display:block;color:var(--ink)}
+.trace{position:sticky;top:0;z-index:10;background:#10191a;border:1px solid #4d6563;box-shadow:0 9px 24px #0a10164d;padding:7px 10px 9px;margin:0 0 12px}
+.trace-head{display:flex;align-items:baseline;gap:5px 12px;flex-wrap:wrap;margin-bottom:5px;color:var(--sub);font-size:12px}
+.trace-head strong{color:var(--gold);font-size:13px}
+.trace-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.trace-item{text-align:left;min-width:0;padding:5px 8px;background:#182426;border:1px solid #354648;line-height:1.35}
+.trace-item[data-input=true]{border-color:#6d9e96;background:#1c302f}
+.trace-item:hover,.trace-item[aria-current=step]{border-color:var(--gold);background:#282c23}
+.trace-item span{display:block;color:var(--sub);font-size:12px}
+.trace-item b{display:block;color:var(--mint);font:13px/1.4 var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.trace-item[data-ready=false] b{color:#9baaa8;font-family:var(--sans)}
+.coordinate-experiment .trace,.coordinate-experiment .steps,.coordinate-experiment .pass-flow,.coordinate-experiment #matrix-jump-top{display:none}
+#matrix-jump-top{margin-top:10px}
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:0 0 8px}
 button{font:inherit;color:inherit;cursor:pointer}
-button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+button:focus-visible,input:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 .step{display:flex;gap:8px;align-items:baseline;justify-content:center;border:1px solid var(--rule);border-top-width:2px;background:#151e20;padding:9px 3px;line-height:1.3}
 .step:hover,.tool:hover{background:#273938}
 .step small{color:var(--sub);font-size:11px}
 .step[aria-pressed=true]{border-top-color:var(--gold);color:var(--gold);background:#232823}
 .step[aria-pressed=true] small{color:var(--gold)}
-.micro{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 14px;margin:0 0 12px;padding:9px 11px;border:1px solid var(--rule);background:#182425}
+.micro{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 14px;margin:0 0 8px;padding:8px 10px;border:1px solid var(--rule);background:#182425}
 .micro[hidden],.trial[hidden],.tool[hidden],.legend[hidden]{display:none}
-.micro-status{color:var(--mint);font:13px var(--mono)}
+.micro-index{display:flex;align-items:center;gap:9px;flex:1 1 280px;min-width:0}
+.micro-status{color:var(--mint);font:13px var(--mono);white-space:nowrap}
+.micro-select{min-width:0;max-width:100%;border:1px solid #52615f;background:#172426;color:var(--ink);font:inherit;font-size:13px;padding:4px 5px}
 .micro-actions{display:flex;gap:6px}
 .tool:disabled{opacity:.45;cursor:default}
-.lab{display:grid;grid-template-columns:minmax(0,1fr) minmax(305px,350px);border:1px solid var(--rule);background:var(--panel)}
-.viewport{min-width:0;min-height:465px;position:relative;overflow:hidden;background:#111b1d}
+.lab{display:grid;grid-template-columns:minmax(0,3fr) minmax(350px,2fr);border:1px solid var(--rule);background:var(--panel)}
+.scene-column{min-width:0;display:flex;flex-direction:column}
+.viewport{min-width:0;height:clamp(420px,38vw,505px);position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#203335,#10191b 70%)}
 canvas.webgl{width:100%;height:100%;position:absolute;inset:0;display:block;touch-action:none;cursor:grab}
 canvas.webgl:active{cursor:grabbing}
 .scene-tag,.legend,.labels{pointer-events:none;position:absolute}
@@ -44,38 +63,130 @@ canvas.webgl:active{cursor:grabbing}
 .guide{min-width:0;border-left:1px solid var(--rule);padding:20px clamp(15px,2.2vw,25px);display:flex;flex-direction:column}
 .tag{margin:0;color:var(--gold);font-size:12px;letter-spacing:.12em}
 .guide h2{font-size:23px;margin:4px 0 8px;line-height:1.3}
-.explain{margin:0;color:var(--sub);min-height:5em}
-.micro-detail{margin:9px 0 0;color:var(--ink);font-size:13px}
+.explain{margin:0;color:var(--sub)}
+.view-derivation .explain{white-space:pre-line}
+.micro-detail{margin:10px 0 0;color:var(--sub);font-size:13px}
 .ruler{margin:9px 0 4px;font:12px var(--mono);color:var(--sub)}
 .ruler-track{height:7px;margin:0 4px;border-bottom:1px solid var(--rule);position:relative}
 .ruler-track::after{content:'';position:absolute;left:var(--at);bottom:-4px;width:7px;height:7px;background:var(--gold);transform:translateX(-50%) rotate(45deg)}
 .ruler-labels{display:flex;justify-content:space-between;margin-top:6px}
-.formula{padding:8px 10px;margin:12px 0 2px;border-left:2px solid var(--mint);background:#1e2d2e;font-size:13px;overflow-wrap:anywhere}
+.formula{padding:9px 11px;margin:13px 0 3px;border-left:2px solid var(--mint);background:#1e2d2e;color:#f0fff6;font-size:14px;overflow-wrap:anywhere}
 .values{margin:8px 0 12px}
-.value{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:baseline;padding:5px 0;border-bottom:1px solid #2c3c3d}
+.value{display:grid;grid-template-columns:minmax(84px,auto) minmax(0,1fr);gap:9px;align-items:baseline;padding:5px 0;border-bottom:1px solid #2c3c3d}
 .values dt{font-size:12px;color:var(--sub)}
 .values dd{margin:0;font:13px/1.5 var(--mono);text-align:right;overflow-wrap:anywhere}
 .value.a dt{color:var(--gold)}.value.b dt{color:var(--mint)}
-.trial{padding-top:12px;margin-top:auto}
+.trial{padding-top:12px}
 .trial-head{display:flex;align-items:baseline;justify-content:space-between;gap:6px;flex-wrap:wrap}
 .trial-head output{font-size:12px;color:var(--mint)}
 input[type=range]{display:block;width:100%;margin:7px 0 4px;accent-color:var(--mint)}
 .trial p,.help,.fallback{font-size:12px;color:var(--sub);margin:0}
+.point-trial{margin:9px 0 0;padding:9px 0 0;border-top:1px solid var(--rule)}
+.point-trial input{accent-color:var(--gold)}
+.point-trial output{color:var(--gold)}
+.point-trial .trial-head:last-child{margin-top:4px}
+.extras{margin-top:10px}
+.scene-foot{flex:1;padding:8px 12px;border-top:1px solid var(--rule);background:#151f21}
+.scene-foot summary{font-size:13px;color:var(--gold)}
+.scene-foot p{margin:6px 0;font-size:13px;color:var(--sub)}
+.scene-foot code{color:var(--mint);overflow-wrap:anywhere}
+.depth-compare{border:1px solid #415857;padding:10px 11px;margin-top:12px;background:#172627}
+.depth-compare h3{font-size:14px;margin:0 0 6px}
+.depth-row{display:grid;grid-template-columns:minmax(122px,auto) minmax(36px,1fr) 36px;align-items:center;gap:8px;font-size:12px}
+.depth-bar{height:6px;background:#35494b}
+.depth-bar i{height:100%;display:block;background:currentColor;width:var(--depth)}
+.depth-row b{font:13px var(--mono);justify-self:end}
+.depth-map{color:var(--gold)}
+.depth-probe{color:var(--mint)}
+.depth-scale{display:flex;justify-content:space-between;color:var(--sub);font-size:11px;margin-top:4px}
+.reading-actions{display:none;justify-content:space-between;gap:6px;margin-top:14px}
+.view-derivation .reading-actions{display:flex}
+.origin-handles{position:absolute;inset:0;pointer-events:none;z-index:2}
+.origin-handle{position:absolute;pointer-events:auto;touch-action:none;transform:translate(-50%,-50%);padding:5px 8px;min-width:36px;border:1px solid #b2c6c0;background:#182829;color:#eef5f0;font:12px var(--mono);cursor:grab}
+.origin-handle:active{cursor:grabbing;background:#35494b}
+.origin-controls{margin:0 0 10px}
+.origin-controls p{margin:5px 0 8px}
+.origin-controls .trial-head{color:var(--ink)}
+.matrix-lab{margin-top:11px;padding-top:11px;border-top:1px solid var(--rule)}
+.matrix-lab h3{font-size:15px;margin:0 0 6px}
+.matrix-lab p{margin:8px 0;color:var(--sub);font-size:13px}
+.matrix-flow{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin:10px 0}
+.matrix-flow[hidden]{display:none}
+.matrix-flow>div{min-width:0;padding:7px 9px;background:#192629;border-top:2px solid #839b96;color:var(--sub);font-size:12px}
+.matrix-flow>div[data-space=light]{border-color:var(--gold)}
+.matrix-flow b{display:block;color:var(--ink);font:13px/1.5 var(--mono);overflow-wrap:anywhere}
+.matrix-flow>span{align-self:center;color:var(--gold)}
+.matrix-picks{display:flex;gap:5px;flex-wrap:wrap}
+.matrix-picks[hidden]{display:none}
+.matrix-picks .tool{flex:1}
+.matrix-derivation{margin-top:12px;border-top:1px solid var(--rule);padding-top:7px}
+.matrix-derivation summary{font-size:13px;color:var(--gold)}
+.matrix-table{width:100%;margin-top:8px;border-collapse:collapse;text-align:right;font:13px/1.4 var(--mono);font-variant-numeric:tabular-nums}
+.matrix-table caption{text-align:left;color:var(--sub);padding:0 0 5px}
+.matrix-table th,.matrix-table td{padding:4px 7px;border-bottom:1px solid #2c3c3d}
+.matrix-table th{color:var(--sub);font-weight:400}
+.matrix-table .active{background:#293738;color:var(--gold)}
+.matrix-table .axis-right{color:#ff8e7e}
+.matrix-table .axis-up{color:#75ddaa}
+.matrix-table .axis-back{color:#85afff}
+.view-row-work th,.view-row-work td{padding:5px 4px}
+.view-row-work tbody th{text-align:left}
+.matrix-sliders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.matrix-sliders label{min-width:0;font:12px var(--mono);color:var(--sub)}
+.matrix-sliders output{color:var(--ink)}
+.matrix-sliders input{margin-inline:0}
+.matrix-map{margin-top:14px;padding-top:10px;border-top:1px solid var(--rule)}
+.matrix-map-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+.matrix-map-cell{padding:4px 1px;text-align:center;background:#19282a;color:#bad0ca;font:12px/1.4 var(--mono)}
+.matrix-map-cell[aria-current=true]{background:#3a3628;color:#ffe0a6;outline:1px solid var(--gold)}
+.matrix-map #matrix-query{color:var(--ink)}
 .help{margin:8px 0 0}
 .fallback{position:absolute;inset:50% 15px auto;text-align:center;pointer-events:none}
 .notes{margin-top:17px;border-top:1px solid var(--rule);padding-top:10px;color:var(--sub)}
 summary{cursor:pointer;color:var(--ink)}
 .notes p{max-width:85ch;margin:8px 0}
 .notes code{font-family:var(--mono);color:var(--mint);overflow-wrap:anywhere}
-@media(max-width:850px){.lab{grid-template-columns:1fr}.viewport{min-height:clamp(315px,65vw,490px)}.guide{border-left:0;border-top:1px solid var(--rule)}.explain{min-height:0}}
-@media(max-width:480px){.step{font-size:12px;gap:2px;flex-direction:column;align-items:center;padding:6px 1px}.camera{top:8px;right:8px}.scene-tag{top:46px;left:9px}.viewport{min-height:335px}.legend{left:9px;font-size:11px}.help{font-size:11px}.pin{font-size:11px}}
+@media(max-width:850px){
+  .lab{grid-template-columns:1fr}
+  .viewport{height:clamp(310px,57vw,420px)}
+  .guide{border-left:0;border-top:1px solid var(--rule)}
+  .reading-actions{display:flex}
+}
+@media(max-width:540px){
+  .trace-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pass-flow{grid-template-columns:1fr 1fr;gap:6px;font-size:12px}
+  .pass-flow>span{display:none}
+  .pass-flow p{height:100%;padding:7px 8px}
+  .step{font-size:12px;gap:2px;flex-direction:column;align-items:center;padding:6px 1px}
+  .micro-actions{margin-left:auto}
+  .camera{top:8px;right:8px}
+  .scene-tag{top:46px;left:9px}
+  .legend{left:9px;font-size:11px}
+  .help,.pin{font-size:11px}
+}
 </style>
 <main>
   <header>
-    <p class="eyebrow">GRAPHICS LAB / 09 &nbsp;·&nbsp; DIRECTIONAL SHADOWS</p>
+    <p class="eyebrow">第 9 章 · 方向光阴影</p>
     <h1>沿着一条光线</h1>
-    <p>跟住方块顶面 A 和地板 B。拖动镜头看它们在三维空间里的位置，再沿着光线看，找出它们为什么会落进同一格。</p>
+    <p>方块顶面的 A 和地板上的 B 可以落进同一格。跟着 A 算出纹理坐标，再移动 B，看看地板上哪一处会被方块挡住。</p>
+    <button class="tool" id="matrix-jump-top" type="button">坐标转换实验 →</button>
   </header>
+  <div class="pass-flow" aria-label="阴影图的两个阶段">
+    <p><strong>写入深度</strong>从灯光视角画场景，每格留下最靠近灯光的一层。</p>
+    <span aria-hidden="true">→</span>
+    <p><strong>查询阴影</strong>从同一视角定位 B，用 B 的深度与格内深度比较。</p>
+  </div>
+  <section class="trace" aria-label="A 的计算结果">
+    <div class="trace-head"><strong>计算结果</strong><span>点任一项，回到它的推导。</span></div>
+    <div class="trace-grid">
+      <button class="trace-item" type="button" data-trace="0"><span>q · A − O（世界轴）</span><b>待推导</b></button>
+      <button class="trace-item" type="button" data-trace="1"><span>V_light · 灯光坐标</span><b>待推导</b></button>
+      <button class="trace-item" type="button" data-trace="2"><span>A · NDC 坐标</span><b>待推导</b></button>
+      <button class="trace-item" type="button" data-trace="3"><span>A · (u, v, z)</span><b>待推导</b></button>
+    </div>
+  </section>
+  <div id="lesson-start">
   <nav class="steps" aria-label="坐标变换步骤">
     <button class="step" type="button" data-step="0" aria-pressed="true"><small>01</small>世界坐标</button>
     <button class="step" type="button" data-step="1" aria-pressed="false"><small>02</small>V · 换轴</button>
@@ -83,17 +194,28 @@ summary{cursor:pointer;color:var(--ink)}
     <button class="step" type="button" data-step="3" aria-pressed="false"><small>04</small>写入深度</button>
     <button class="step" type="button" data-step="4" aria-pressed="false"><small>05</small>读取阴影</button>
   </nav>
-  <div class="micro" id="micro" hidden>
-    <span class="micro-status" id="micro-status"></span>
+  <div class="micro" id="micro">
+    <div class="micro-index">
+      <label class="micro-status" id="micro-status" for="micro-select"></label>
+      <select class="micro-select" id="micro-select" aria-label="跳到当前阶段的讲解步骤"></select>
+    </div>
     <div class="micro-actions">
-      <button class="tool" id="micro-prev" type="button">← 上一小步</button>
-      <button class="tool" id="micro-next" type="button">下一小步 →</button>
+      <button class="tool" id="matrix-return" type="button" hidden>← 返回主线</button>
+      <button class="tool" id="micro-prev" type="button">← 上一步</button>
+      <button class="tool" id="micro-next" type="button">下一步 →</button>
     </div>
   </div>
+  </div>
   <div class="lab">
+    <div class="scene-column">
     <section class="viewport" id="viewport" aria-label="三维阴影场景">
       <div class="scene-tag" id="scene-tag"></div>
       <div class="labels" id="labels" aria-hidden="true"></div>
+      <div class="origin-handles" id="origin-handles" aria-hidden="true" hidden>
+        <button class="origin-handle" type="button" data-origin-handle="0" tabindex="-1">移 X</button>
+        <button class="origin-handle" type="button" data-origin-handle="1" tabindex="-1">移 Y</button>
+        <button class="origin-handle" type="button" data-origin-handle="2" tabindex="-1">移 Z</button>
+      </div>
       <div class="camera" role="group" aria-label="观察角度">
         <button class="tool" id="oblique" type="button">斜看场景</button>
         <button class="tool" id="along" type="button" aria-pressed="false">沿光线看</button>
@@ -101,12 +223,94 @@ summary{cursor:pointer;color:var(--ink)}
       <div class="legend"><span><i class="caster"></i>A 方块顶面</span><span><i class="receiver"></i>B 地板取样点</span><span>蓝线 = 光线方向</span></div>
       <p class="fallback" id="fallback">正在加载三维场景…</p>
     </section>
-    <section class="guide" aria-label="当前步骤讲解">
+    <div class="scene-foot">
+      <div class="origin-controls" id="origin-controls" hidden>
+        <div class="trial-head">
+          <strong>移动灰色世界原点 W</strong>
+          <button class="tool" id="origin-reset" type="button">还原世界原点</button>
+        </div>
+        <p>拖图中的「移 X / Y / Z」把手，或用滑块微调。这里的数值表示 W 从实验初始位置移了多少。</p>
+        <div class="matrix-sliders" role="group" aria-label="移动世界原点 W">
+          <label for="origin-x">沿 X <output id="origin-x-value" for="origin-x">0</output><input id="origin-x" type="range" min="-2" max="2" step=".1" value="0"></label>
+          <label for="origin-y">沿 Y <output id="origin-y-value" for="origin-y">0</output><input id="origin-y" type="range" min="-2" max="2" step=".1" value="0"></label>
+          <label for="origin-z">沿 Z <output id="origin-z-value" for="origin-z">0</output><input id="origin-z" type="range" min="-2" max="2" step=".1" value="0"></label>
+        </div>
+      </div>
+      <p class="help" id="scene-help">拖动旋转，滚轮或双指缩放。「沿光线看」只改变观察角度。</p>
+      <details id="setup">
+        <summary>查看示例参数和点的位置来源</summary>
+        <p><strong>手动设定</strong>　灯光原点 <code id="setup-origin"></code>，光线方向 <code id="setup-axis"></code>，灯光上轴 <code id="setup-up"></code>。覆盖盒取 <code>xₗ ∈ [−4, 4]，yₗ ∈ [0, 8]，d ∈ [0, 10]</code>。</p>
+        <p><strong>构造 A</strong>　默认从 O 沿右轴走 1、上轴走 2、光线方向走 3，再用滑块沿世界 X 平移方块和顶面点 A。<code id="setup-a"></code></p>
+        <p><strong>构造 B</strong>　阴影图分成 4 列、6 行，从左下角数 0。用格子中心确定射线起点。<code id="setup-b"></code></p>
+      </details>
+    </div>
+    </div>
+    <section class="guide" id="lesson-guide" aria-label="当前步骤讲解">
       <div aria-live="polite" aria-atomic="true">
         <p class="tag" id="tag"></p>
         <h2 id="stage-title"></h2>
         <p class="explain" id="explain"></p>
+      </div>
+      <div class="matrix-lab" id="matrix-lab" hidden>
+        <div id="matrix-sample" hidden>
+          <h3>设置标记相对灯光的位置</h3>
+          <div class="matrix-sliders" role="group" aria-label="调整样例点的灯光坐标">
+            <label for="matrix-x">向右 <output id="matrix-x-value" for="matrix-x">1</output><input id="matrix-x" type="range" min="-3.5" max="3.5" step=".1" value="1"></label>
+            <label for="matrix-y">向上 <output id="matrix-y-value" for="matrix-y">2</output><input id="matrix-y" type="range" min=".5" max="5.5" step=".1" value="2"></label>
+            <label for="matrix-z">向前 <output id="matrix-z-value" for="matrix-z">3</output><input id="matrix-z" type="range" min=".5" max="7" step=".1" value="3"></label>
+          </div>
+          <p>灯光的 Z 轴朝后，所以向前的距离写成负的灯光 Z。</p>
+        </div>
+        <div id="matrix-world-source" hidden>
+          <h3>选择要查阴影的场景点</h3>
+          <div class="matrix-picks" role="group" aria-label="选择输入点">
+            <button class="tool" type="button" data-matrix-source="marker">刚放好的标记</button>
+            <button class="tool" type="button" data-matrix-source="floor">地板点 B</button>
+          </div>
+          <label id="matrix-floor-trial" for="matrix-floor-column" hidden>移动地板点 B <output id="matrix-floor-value" for="matrix-floor-column"></output><input id="matrix-floor-column" type="range" min="0" max="3" step="1" value="2"></label>
+        </div>
+        <div class="matrix-flow" id="matrix-flow">
+          <div id="matrix-input-panel"><span id="matrix-input-label"></span><b id="matrix-input"></b></div>
+          <span id="matrix-flow-arrow" aria-hidden="true">→</span>
+          <div id="matrix-output-panel"><span id="matrix-output-label"></span><b id="matrix-output"></b></div>
+        </div>
+        <section class="matrix-map" id="matrix-map" hidden aria-label="该点在阴影图中的位置">
+          <h3>用灯光坐标定位阴影图</h3>
+          <p id="matrix-address"></p>
+          <div class="matrix-map-grid" id="matrix-map-grid" role="group" aria-label="阴影图每格保存的深度，顶部是第 5 行"></div>
+          <p id="matrix-query"></p>
+        </section>
+        <details class="matrix-derivation" id="matrix-derivation">
+          <summary id="matrix-derivation-title">怎样构造矩阵</summary>
+          <p id="matrix-bridge"></p>
+          <div class="matrix-picks" id="matrix-columns" role="group" aria-label="选择要观察的矩阵列">
+            <button class="tool" type="button" data-matrix-col="3">只看原点 O</button>
+            <button class="tool" type="button" data-matrix-col="0">右移一格 R</button>
+            <button class="tool" type="button" data-matrix-col="1">上移一格 U</button>
+            <button class="tool" type="button" data-matrix-col="2">后移一格 K</button>
+          </div>
+          <div class="matrix-picks" id="matrix-rows" role="group" aria-label="选择要观察的矩阵行" hidden>
+            <button class="tool" type="button" data-matrix-row="0">灯光横向</button>
+            <button class="tool" type="button" data-matrix-row="1">灯光高度</button>
+            <button class="tool" type="button" data-matrix-row="2">灯光 Z</button>
+          </div>
+          <table class="matrix-table" id="lesson-matrix">
+            <caption id="matrix-caption"></caption>
+            <thead><tr id="matrix-head"></tr></thead>
+            <tbody id="matrix-body"></tbody>
+          </table>
+          <p id="matrix-arithmetic"></p>
+        </details>
+      </div>
+      <div aria-live="polite" aria-atomic="true">
         <p class="formula" id="formula"></p>
+        <table class="matrix-table view-row-work" id="view-row-work" hidden>
+          <caption>每列上下两个数相乘，再把四列的乘积相加</caption>
+          <thead>
+            <tr><th scope="col">对应项</th><th scope="col">世界 X</th><th scope="col">世界 Y</th><th scope="col">世界 Z</th><th scope="col">第 4 格</th></tr>
+          </thead>
+          <tbody id="view-row-body"></tbody>
+        </table>
         <dl class="values" id="values"></dl>
         <div id="ruler" class="ruler" hidden>
           <div id="ruler-track" class="ruler-track" aria-hidden="true"></div>
@@ -114,14 +318,34 @@ summary{cursor:pointer;color:var(--ink)}
         </div>
         <p id="micro-detail" class="micro-detail" hidden></p>
       </div>
-      <div class="trial">
-        <div class="trial-head"><label for="probe">地板点 B 横移</label><output id="probe-value" for="probe"></output></div>
+      <div class="trial point-trial" id="point-trial" hidden>
+        <div class="trial-head"><label for="point-x">移动 A 的世界 X</label><output id="point-x-value" for="point-x"></output></div>
+        <input id="point-x" type="range" min="-0.4" max="4.6" step="0.05" aria-describedby="point-hint">
+        <div class="trial-head">
+          <p id="point-hint">方块和顶面点 A 一起横移。后续步骤沿用这个位置。</p>
+          <button class="tool" id="point-reset" type="button">恢复默认位置</button>
+        </div>
+      </div>
+      <section class="depth-compare" id="depth-compare" hidden>
+        <h3>同一格的两个深度</h3>
+        <div class="depth-row depth-map"><span>格内最近深度</span><span class="depth-bar" aria-hidden="true"><i id="map-bar"></i></span><b id="map-depth"></b></div>
+        <div class="depth-row depth-probe"><span>B 的参考深度</span><span class="depth-bar" aria-hidden="true"><i id="probe-bar"></i></span><b id="probe-depth"></b></div>
+        <div class="depth-scale"><span>0 · 近面</span><span>1 · 远面</span></div>
+      </section>
+      <div class="trial" id="probe-trial">
+        <div class="trial-head"><label id="probe-label" for="probe">地板点 B 横移</label><output id="probe-value" for="probe"></output></div>
         <input id="probe" type="range" min="0" max="3" step="1" value="2" aria-describedby="probe-hint">
         <p id="probe-hint">按阴影纹素的中心对齐。试试从第 2 列移到第 3 列。</p>
       </div>
+      <div class="reading-actions" aria-label="继续阅读">
+        <button class="tool" id="reading-prev" type="button">← 上一步</button>
+        <button class="tool" id="reading-next" type="button">下一步 →</button>
+      </div>
     </section>
   </div>
-  <p class="help">拖动场景旋转，滚轮或双指缩放。「沿光线看」只切换观察镜头，不改变光照或点的位置。</p>
+  <div class="extras">
+    <button class="tool" id="matrix-jump" type="button">补充实验 · 两套坐标怎么转换？</button>
+  </div>
   <details class="notes">
     <summary>这个实验怎样对应 Unity URP？</summary>
     <p>写图时，URP 先切到灯光的视图和投影矩阵，ShadowCaster 输出裁剪位置，再由 GPU 光栅化三角形并执行深度测试。这里直接沿每个纹素中心发一条光线，用相交结果演示同样的「存最近一层」，没有用 Three.js 的实时阴影替代这一步。</p>
@@ -4391,7 +4615,20 @@ void main() {
   const OrbitControls = window.ShadowLabThree.OrbitControls;
   const id = name => document.getElementById(name);
   const buttons = [...document.querySelectorAll('[data-step]')];
+  const traceButtons = [...document.querySelectorAll('[data-trace]')];
+  const stepSelect = id('micro-select');
   const viewport = id('viewport');
+  const pointX = id('point-x');
+  const matrixSliders = ['matrix-x', 'matrix-y', 'matrix-z'].map(id);
+  const originSliders = ['origin-x', 'origin-y', 'origin-z'].map(id);
+  const originHandles = [...document.querySelectorAll('[data-origin-handle]')];
+  const matrixColumnButtons = [...document.querySelectorAll('[data-matrix-col]')];
+  const matrixRowButtons = [...document.querySelectorAll('[data-matrix-row]')];
+  const matrixSourceButtons = [...document.querySelectorAll('[data-matrix-source]')];
+  const matrixFloorColumn = id('matrix-floor-column');
+  const viewMatrixSteps = {projectPoint: 9, changeOrigin: 10, compare: 11, rightRow: 12, upRow: 13, backRow: 14, result: 15};
+  const viewMatrixRowSteps = [viewMatrixSteps.rightRow, viewMatrixSteps.upRow, viewMatrixSteps.backRow];
+  const matrixSteps = {frames: 16, columns: 17, place: 18, shadow: 19};
   const v = (x, y, z) => new T.Vector3(x, y, z);
   const colors = { a: 0xf5c674, b: 0x75ddcc, ray: 0x77bbff, grid: 0x35494b, frame: 0x659393, floor: 0x243738 };
   const O = v(0, 5.8, 4);
@@ -4400,6 +4637,10 @@ void main() {
   const F = lightDirection.clone().normalize();
   const backward = F.clone().negate();
   const R = U.clone().cross(backward);
+  const worldOrigin = v(0, 0, 0);
+  const lightOriginInWorld = O.clone();
+  const matrixLightToWorld = new T.Matrix4().makeBasis(R, U, backward).setPosition(lightOriginInWorld);
+  const matrixWorldToLight = matrixLightToWorld.clone().invert();
   const V = new T.Matrix4().set(
     R.x, R.y, R.z, -R.dot(O),
     U.x, U.y, U.z, -U.dot(O),
@@ -4412,98 +4653,534 @@ void main() {
   const displayPV = new T.Matrix4().makeScale(4, 4, -4).multiply(PV);
   const spaces = [new T.Matrix4(), V, displayPV, displayPV, displayPV];
   const fromLight = (x, y, d) => O.clone().addScaledVector(R, x).addScaledVector(U, y).addScaledVector(F, d);
-  const A = fromLight(1, 2, 3);
-  const block = new T.Box3(v(1.9, 2.8, 1.35), v(3.4, 4, 2.65));
+  const defaultA = fromLight(1, 2, 3);
+  const defaultBlock = new T.Box3(v(1.9, 2.8, 1.35), v(3.4, 4, 2.65));
+  const A = defaultA.clone();
+  const block = defaultBlock.clone();
   const ground = new T.Plane(v(0, 1, 0), 0);
   const cols = 4, rows = 6, row = 1;
   const flatZ = 1e-6;
   let column = 2, step = 0, micro = 0;
+  let matrixColumn = 3, matrixRow = 0;
+  let matrixSource = 'marker', originDrag;
+  let matrixReturn, unlockedTraceCount = 0;
   const q = A.clone().sub(O);
   const lightA = A.clone().applyMatrix4(V);
   const ndcA = A.clone().applyMatrix4(PV);
   const texA = ndcA.clone().multiplyScalar(.5).addScalar(.5);
   const viewLesson = () => step === 1;
+  const matrixLesson = () => viewLesson() && micro >= matrixSteps.frames;
+  const viewDerivation = () => viewLesson() && micro >= viewMatrixSteps.projectPoint && micro <= viewMatrixSteps.result;
+  const markerInput = () => v(matrixSliders[0].valueAsNumber, matrixSliders[1].valueAsNumber, -matrixSliders[2].valueAsNumber);
+  const pointTrialActive = () => viewDerivation() || (viewLesson() && micro === 6);
   const projectLesson = () => step === 2 && micro < 4;
   const writing = () => step === 3 && micro === 3;
   const textureLesson = () => step === 3 && !writing();
-  const hasLesson = () => step >= 1;
   const worldScene = () => step === 0 || (step === 4 && micro === 0);
-  const project = p => p.clone().applyMatrix4(spaces[worldScene() ? 0 : projectLesson() ? 1 : step]);
+  const sceneTransform = () => spaces[worldScene() || viewLesson() ? 0 : projectLesson() ? 1 : step];
+  const project = p => p.clone().applyMatrix4(sceneTransform());
   const uvDepth = p => p.clone().applyMatrix4(PV).multiplyScalar(.5).addScalar(.5);
   const fmt = n => String(Number(n.toFixed(3)));
+  const signed = n => {
+    const text = fmt(n);
+    return Number(text) > 0 ? '+' + text : text.replace('-', '−');
+  };
   const tuple = p => '(' + p.toArray().map(fmt).join(', ') + ')';
+  const pointTuple4 = point => '(' + [...point.toArray().map(fmt), '1'].join(', ') + ')';
   const ztext = n => n.toFixed(2);
-  const samples = Array.from({ length: rows }, (_, j) => Array.from({ length: cols }, (_, i) => {
-    const x = -4 + (i + .5) * 8 / cols;
-    const y = (j + .5) * 8 / rows;
-    const ray = new T.Ray(fromLight(x, y, 0), F);
-    const land = ray.intersectPlane(ground, v(0, 0, 0));
-    const cube = ray.intersectBox(block, v(0, 0, 0));
-    const groundDepth = land && uvDepth(land).z;
-    const cubeDepth = cube && uvDepth(cube).z;
-    const dFloor = groundDepth !== null && groundDepth <= 1 ? groundDepth : 1;
-    const dCube = cubeDepth !== null && cubeDepth <= 1 ? cubeDepth : 1;
-    return { x, y, land, cube, groundDepth: dFloor, cubeDepth: dCube, depth: Math.min(1, dFloor, dCube) };
-  }));
+  function sampleDepthMap() {
+    return Array.from({ length: rows }, (_, gridRow) => Array.from({ length: cols }, (_, gridColumn) => {
+      const x = -4 + (gridColumn + .5) * 8 / cols;
+      const y = (gridRow + .5) * 8 / rows;
+      const ray = new T.Ray(fromLight(x, y, 0), F);
+      const land = ray.intersectPlane(ground, v(0, 0, 0));
+      const cube = ray.intersectBox(block, v(0, 0, 0));
+      const groundDepth = land && uvDepth(land).z;
+      const cubeDepth = cube && uvDepth(cube).z;
+      const dFloor = groundDepth !== null && groundDepth <= 1 ? groundDepth : 1;
+      const dCube = cubeDepth !== null && cubeDepth <= 1 ? cubeDepth : 1;
+      return { x, y, start: ray.origin, land, cube, groundDepth: dFloor, cubeDepth: dCube, depth: Math.min(1, dFloor, dCube) };
+    }));
+  }
+  let samples = sampleDepthMap();
   const current = () => samples[row][column];
-  const reading = (label, value) => [label, value, ''];
+  const texelIndex = (uv, size) => Math.floor(uv * size + 1e-9);
+  const colA = () => texelIndex(texA.x, cols);
+  const rowA = () => texelIndex(texA.y, rows);
+  const onRayThroughA = sample => Math.hypot(lightA.x - sample.x, lightA.y - sample.y) < flatZ;
+  const reading = (label, value, tone = '') => [label, value, tone];
+  const gridAddress = (gridRow = row, gridColumn = column) => '第 ' + gridRow + ' 行 · 第 ' + gridColumn + ' 列';
+  const dotTerms = (offset, axis) => offset.toArray().map((value, index) =>
+    '(' + fmt(value) + ') × (' + fmt(axis.getComponent(index)) + ')').join(' + ');
+  function rightAxisLesson() {
+    return [
+      '点积读出右轴刻度 xₗ',
+      '把金色位移垂直投到红轴 R。R 的长度是 1，位移在它上面的带符号长度就是灯光横坐标。',
+      'xₗ = q · R = ' + dotTerms(q, R) + ' = ' + fmt(lightA.x),
+      [reading('q = A − O', tuple(q), 'a'), reading('右轴 R = U × K', tuple(R)), reading('垂足 H · 红轴刻度', signed(lightA.x))],
+      '沿 R 的反方向读到负数。拖动滑块，看看世界 X 的变化怎样传给灯光横坐标。'
+    ];
+  }
+  function viewAxisLesson(index, title, explain, detail) {
+    const axis = axes[index], symbol = ['R', 'U', 'K'][index];
+    const coordinate = ['xₗ', 'yₗ', 'zₗ'][index];
+    return [
+      title, explain,
+      coordinate + ' = q · ' + symbol + ' = ' + dotTerms(q, axis) + ' = ' + fmt(lightA.getComponent(index)),
+      [reading('q = A − O', tuple(q), 'a'), reading('灯光轴 ' + symbol, tuple(axis))],
+      detail
+    ];
+  }
+  function viewMatrixProjectPointLesson() {
+    const pointComponents = A.toArray();
+    const axisComponents = R.toArray();
+    const products = axisComponents.map((value, index) => value * pointComponents[index]);
+    return [
+      '从世界原点算 A 的投影',
+      '世界坐标 A 的三个数，表示从世界原点 W 沿世界 X、Y、Z 各走多少。红色数轴经过 W，方向和灯光右轴 R 一致。\n\n把 A 垂直投到红线上得到 A′。R 的长度是 1，所以点积 R · A 给出的就是从 W 到 A′ 沿红线的带符号长度。',
+      'R · A = R.x × A.x + R.y × A.y + R.z × A.z',
+      [
+        reading('A 的世界坐标（X、Y、Z）', tuple(A), 'a'),
+        reading('R 沿世界 X、Y、Z 的分量', tuple(R)),
+        ...products.map((value, index) => reading('世界 ' + ['X', 'Y', 'Z'][index] + ' 项',
+          fmt(axisComponents[index]) + ' × (' + fmt(pointComponents[index]) + ') = ' + fmt(value))),
+        reading('三个乘积相加', products.map(fmt).join(' + ') + ' = ' + fmt(R.dot(A)), 'a')
+      ],
+      'A.x 是 A 的世界 X，R.x 是 R 沿世界 X 的分量。同一个方向的两个数相乘，再将三项相加。此时得到的是以 W 为零的刻度。'
+    ];
+  }
+  function viewMatrixChangeOriginLesson() {
+    const pointProjection = fmt(R.dot(A));
+    const originProjection = fmt(R.dot(O));
+    return [
+      '把灯光原点 O 的刻度设为 0',
+      '把灯光原点 O 也垂直投到同一条红线上，得到 O′。此时 A′ 和 O′ 的刻度都从 W 算起。\n\n要从 O′ 开始量，就让这条线上每个旧刻度都减去 O′ 的旧刻度。O′ 会变成 0，A′ 的新刻度就是灯光横坐标。',
+      '灯光横坐标 xₗ = A′ 的旧刻度 − O′ 的旧刻度',
+      [
+        reading('O 的世界坐标', tuple(O)),
+        reading('O′ 的旧刻度', 'R · O = ' + dotTerms(O, R) + ' = ' + originProjection),
+        reading('A′ 的旧刻度', 'R · A = ' + pointProjection, 'a'),
+        reading('O′ 的新刻度', originProjection + ' − ' + originProjection + ' = 0'),
+        reading('A′ 的新刻度', pointProjection + ' − ' + originProjection + ' = ' + fmt(lightA.x), 'a')
+      ],
+      '图中金色短箭头量的是 O′ 到 A′。沿 R 的正方向是正数，反方向是负数。移动 A 可以看到哪个旧刻度在变。'
+    ];
+  }
+  function viewMatrixCompareLesson() {
+    const expandedProducts = A.toArray().map((component, index) => {
+      const coefficient = fmt(R.getComponent(index));
+      const pointValue = fmt(component);
+      const originValue = fmt(O.getComponent(index));
+      return reading('展开世界 ' + ['X', 'Y', 'Z'][index] + ' 项',
+        coefficient + ' × (' + pointValue + ' − ' + originValue + ') = ' +
+        coefficient + ' × (' + pointValue + ') − ' + coefficient + ' × (' + originValue + ')');
+    });
+    return [
+      '为什么先算 A − O 也一样',
+      '前面算过 q = A − O，也就是图中从 O 到 A 的位移。对 q 做点积时，世界 X、Y、Z 各有一个「先相减，再乘系数」的算式。把乘法分到减号两边，就得到下面的展开。',
+      'R · (A − O) = R · A − R · O',
+      [
+        reading('先相减求 q', tuple(A) + ' − ' + tuple(O) + ' = ' + tuple(q), 'a'),
+        ...expandedProducts,
+        reading('先换起点，再投影', 'R · q = ' + dotTerms(q, R) + ' = ' + fmt(R.dot(q))),
+        reading('先投影，再换零点', 'R · A − R · O = ' + fmt(R.dot(A)) + ' − ' + fmt(R.dot(O)) + ' = ' + fmt(lightA.x), 'a')
+      ],
+      '把三个方向中含 A 的项加起来，得到 R · A。把含 O 的项加起来，得到 R · O。这三项前面都有减号，所以总和就是 R · A − R · O。'
+    ];
+  }
+  function viewMatrixRowMultiplication(rowIndex) {
+    const coefficients = [0, 1, 2, 3].map(columnIndex => V.elements[columnIndex * 4 + rowIndex]);
+    const input = [...A.toArray(), 1];
+    const products = coefficients.map((value, index) => value * input[index]);
+    return {coefficients, input, products};
+  }
+  function viewMatrixRowLesson(rowIndex, title, explain, detail) {
+    const axis = axes[rowIndex];
+    const symbol = ['R', 'U', 'K'][rowIndex];
+    const coordinate = ['xₗ', 'yₗ', 'zₗ'][rowIndex];
+    const originProjection = axis.dot(O);
+    const {products} = viewMatrixRowMultiplication(rowIndex);
+    const sum = products.map(value => value < 0 ? '(' + fmt(value) + ')' : fmt(value)).join(' + ');
+    return [
+      title, explain,
+      coordinate + ' = ' + symbol + ' · A − ' + symbol + ' · O',
+      [
+        reading('拿 O 算第四格', '−(' + dotTerms(O, axis) + ') = ' + fmt(-originProjection)),
+        reading('把四个乘积相加', sum + ' = ' + fmt(lightA.getComponent(rowIndex)), 'a')
+      ],
+      detail
+    ];
+  }
+  function viewMatrixResultLesson() {
+    const lightOrigin = O.clone().applyMatrix4(V);
+    return [
+      '合成 V_light，再用灯光原点验算',
+      '前三行各算一个灯光坐标，依次得到 xₗ、yₗ、zₗ。第四行 (0, 0, 0, 1) 把点末尾的 1 原样传给输出。这样输出仍有四项，可以交给下一阶段的投影矩阵 P。',
+      'V_light × ' + pointTuple4(A) + ' = ' + pointTuple4(lightA),
+      [
+        reading('第四行的计算', '0 × X + 0 × Y + 0 × Z + 1 × 1 = 1'),
+        reading('把灯光原点 O 当作输入', pointTuple4(O)),
+        reading('O 在自己的坐标系里', pointTuple4(lightOrigin), 'a')
+      ],
+      '输入 O 时，前三行都在算 O 的投影刻度减去自身，所以灯光坐标前三项都是 0。图中的三段彩色箭头依次从 O 走向 A，对应矩阵算出的三个带符号长度。'
+    ];
+  }
+  function matrixExperiment() {
+    if (micro === matrixSteps.columns) {
+      const local = v(0, 0, 0);
+      if (matrixColumn < 3) local.setComponent(matrixColumn, 1);
+      const world = local.clone().applyMatrix4(matrixLightToWorld);
+      return {local, world, scenePoint: world.clone().add(worldOrigin)};
+    }
+    const markerWorld = markerInput().applyMatrix4(matrixLightToWorld);
+    const useFloor = micro === matrixSteps.shadow && matrixSource === 'floor';
+    const world = useFloor
+      ? samples[row][matrixFloorColumn.valueAsNumber].land.clone().sub(worldOrigin)
+      : markerWorld;
+    const local = world.clone().applyMatrix4(matrixWorldToLight);
+    const uv = local.clone().applyMatrix4(P).multiplyScalar(.5).addScalar(.5);
+    const gridRow = texelIndex(uv.y, rows), gridColumn = texelIndex(uv.x, cols);
+    const cell = uv.z >= 0 && uv.z <= 1 ? samples[gridRow]?.[gridColumn] : undefined;
+    return {local, world, scenePoint: world.clone().add(worldOrigin), uv, gridRow, gridColumn, cell, useFloor};
+  }
+
+  function matrixFrameLesson() {
+    return [
+      '同一个位置，两套坐标',
+      '金色标记在场景里只有一个位置。世界坐标从灰色原点 W 出发，按世界 X、Y、Z 量。灯光坐标从白色原点 O 出发，按彩色的右、上、后三根轴量。',
+      '', [],
+      '拖动灰色原点的把手，观察同一个标记的两套读数。灯光坐标用灯光自己的原点和轴来量。'
+    ];
+  }
+  function matrixColumnLesson() {
+    return [
+      '怎样拼出「灯光坐标 → 世界坐标」矩阵？',
+      '先问两个简单问题：灯光原点在世界的哪儿？沿灯光的一根轴移一格，在世界里会多出哪段位移？一个位置加上三段方向，刚好填四列。',
+      '', [],
+      '先选「只看原点 O」，再选「右移一格 R」。对比原点和箭头末端的世界读数。'
+    ];
+  }
+  function matrixForwardLesson() {
+    return [
+      '把标记放到灯光前方',
+      '输入是相对灯光的距离。要把标记放进场景，程序把这些距离乘上灯光到世界的矩阵，得到以 W 为起点的世界位置。',
+      '', [],
+      '拖动任一滑块，观察彩色位移和金色标记。下一步读取场景中这个位置的阴影。'
+    ];
+  }
+  function matrixReverseLesson() {
+    return [
+      '给场景里的点查阴影',
+      '输入来自场景里的世界位置。先用视图矩阵换成灯光坐标，灯光横向和高度给出图上的位置，前方距离用来比较深度。',
+      '', [],
+      '试试选「地板点 B」并左右移动它。3D 图里的高亮格和下方深度表由同一个点的换算结果选出。'
+    ];
+  }
+  function matrixCell(tag, text, tone, active) {
+    const cell = document.createElement(tag);
+    cell.className = tone + (active ? ' active' : '');
+    cell.textContent = text;
+    return cell;
+  }
+  function updateMatrixGuide() {
+    const showingView = viewLesson() && micro === viewMatrixSteps.result;
+    const active = matrixLesson();
+    viewport.closest('main').classList.toggle('coordinate-experiment', active);
+    id('matrix-lab').hidden = !active && !showingView;
+    id('origin-controls').hidden = !active;
+    id('origin-handles').hidden = !active || !renderer;
+    id('setup').hidden = active;
+    id('scene-help').textContent = active ? '拖空白处旋转视角，滚轮或双指缩放。' : '拖动旋转，滚轮或双指缩放。「沿光线看」只改变观察角度。';
+    if (!active && !showingView) return;
+
+    const frames = micro === matrixSteps.frames;
+    const building = micro === matrixSteps.columns;
+    const placing = micro === matrixSteps.place;
+    const querying = micro === matrixSteps.shadow;
+    const reversing = showingView || querying;
+    const matrix = showingView ? V : querying ? matrixWorldToLight : matrixLightToWorld;
+    const experiment = active ? matrixExperiment() : null;
+    const tones = ['axis-right', 'axis-up', 'axis-back', ''];
+    id('matrix-flow').hidden = !active;
+    id('matrix-derivation').hidden = frames;
+    id('matrix-derivation-title').textContent = reversing ? '展开世界 → 灯光矩阵的推导' : '展开灯光 → 世界矩阵的推导';
+    id('matrix-columns').hidden = !building;
+    id('matrix-sample').hidden = !placing;
+    id('matrix-rows').hidden = !querying;
+    id('matrix-world-source').hidden = !querying;
+    id('matrix-floor-trial').hidden = !querying || matrixSource !== 'floor';
+    id('matrix-map').hidden = !querying;
+    id('matrix-floor-value').textContent = gridAddress(row, matrixFloorColumn.valueAsNumber);
+    for (const slider of [...matrixSliders, ...originSliders]) {
+      id(slider.id + '-value').textContent = fmt(slider.valueAsNumber);
+    }
+    matrixColumnButtons.forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.matrixCol) === matrixColumn)));
+    matrixRowButtons.forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.matrixRow) === matrixRow)));
+    matrixSourceButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.matrixSource === matrixSource)));
+
+    if (experiment) {
+      const {local, world} = experiment;
+      const pointName = experiment.useFloor ? 'B' : '标记';
+      id('matrix-input-panel').dataset.space = frames || querying ? 'world' : 'light';
+      id('matrix-output-panel').dataset.space = frames || querying ? 'light' : 'world';
+      id('matrix-flow-arrow').textContent = frames ? '同一点' : '→';
+      id('matrix-input-label').textContent = frames ? '世界坐标 · 从 W 量'
+        : querying ? '输入 · ' + pointName + '的世界坐标' : '输入 · ' + (building ? '测试点' : pointName) + '的灯光坐标';
+      id('matrix-output-label').textContent = frames ? '灯光坐标 · 从 O 量'
+        : querying ? '输出 · ' + pointName + '的灯光坐标' : '输出 · ' + (building ? '测试点' : pointName) + '的世界坐标';
+      id('matrix-input').textContent = tuple(frames || querying ? world : local);
+      id('matrix-output').textContent = tuple(frames || querying ? local : world);
+    }
+    if (querying) updateMatrixMap(experiment);
+    if (frames) return;
+
+    id('matrix-caption').textContent = reversing ? 'V_light（视图矩阵） · 输入世界坐标，输出灯光坐标'
+      : '灯光 → 世界矩阵 · 每列在世界坐标里表示什么';
+    id('matrix-bridge').textContent = reversing
+      ? '每行对应一根灯光轴。前三项和输入点的世界坐标做点积，得到以 W 为零的投影刻度。第四项扣掉 O 在同一根轴上的投影刻度，把零点改到 O。用 O 自己验算时，每行都是同一个刻度减去自身，三个灯光坐标都为 0。'
+      : '从世界原点看，测试点的位置分成两段：先到灯光原点 O，再按灯光的三根轴给出偏移。前三列装这三根单位轴，第四列装 O 在世界中的坐标。点的输入补 1，让第四列加一次。';
+    const coefficients = [...(experiment?.local.toArray() ?? [0, 0, 0]), 1];
+    const headers = reversing ? ['X', 'Y', 'Z', '−轴·O'] : ['R', 'U', 'K', 'O'];
+    const columnHeaders = headers.map((label, index) => {
+      const text = placing ? label + ' × ' + fmt(coefficients[index]) : label;
+      return matrixCell('th', text, reversing ? '' : tones[index], building && index === matrixColumn);
+    });
+    columnHeaders.unshift(matrixCell('th', '输出', '', false));
+    id('matrix-head').replaceChildren(...columnHeaders);
+    id('matrix-body').replaceChildren(...[0, 1, 2, 3].map(row => {
+      const tr = document.createElement('tr');
+      const outputs = reversing ? ['xₗ', 'yₗ', 'zₗ', 'w'] : ['X', 'Y', 'Z', 'w'];
+      const header = matrixCell('th', outputs[row], reversing ? tones[row] : '', querying && row === matrixRow);
+      header.scope = 'row';
+      tr.append(header);
+      tr.append(...headers.map((_, col) => {
+        const highlighted = (querying && row === matrixRow) || (building && col === matrixColumn);
+        return matrixCell('td', fmt(matrix.elements[col * 4 + row]), tones[reversing ? row : col], highlighted);
+      }));
+      return tr;
+    }));
+    id('matrix-arithmetic').textContent = matrixArithmetic(experiment, building, placing, querying);
+  }
+
+  function updateViewMatrixRow() {
+    const rowIndex = viewLesson() ? viewMatrixRowSteps.indexOf(micro) : -1;
+    id('view-row-work').hidden = rowIndex < 0;
+    if (rowIndex < 0) return;
+
+    const {coefficients, input, products} = viewMatrixRowMultiplication(rowIndex);
+    const axisTone = ['axis-right', 'axis-up', 'axis-back'][rowIndex];
+    const rows = [['矩阵行', coefficients, axisTone], ['输入 A', input, ''], ['乘积', products, '']];
+    id('view-row-body').replaceChildren(...rows.map(([label, values, tone]) => {
+      const row = document.createElement('tr');
+      const heading = matrixCell('th', label, '', false);
+      heading.scope = 'row';
+      row.append(heading, ...values.map((value, index) => matrixCell('td', fmt(value), tone, index === 3)));
+      return row;
+    }));
+  }
+
+  function matrixArithmetic(experiment, building, placing, querying) {
+    if (building) {
+      const start = '输入 ' + pointTuple4(experiment.local) + '。';
+      if (matrixColumn === 3) {
+        return start + '前三列都乘 0，第四列乘 1，输出就是灯光原点的世界坐标 ' + tuple(lightOriginInWorld) + '。';
+      }
+      const axisTag = ['R', 'U', 'K'][matrixColumn];
+      return start + 'O 的世界位置 ' + tuple(lightOriginInWorld) + ' 加上 ' + axisTag + ' 方向 ' + tuple(axes[matrixColumn]) + '，得到测试点 ' + tuple(experiment.world) + '。两点相减正好是 ' + axisTag + '，这就是该列填的数。';
+    }
+    if (placing) {
+      const pieces = axes.map((axis, index) => tuple(axis.clone().multiplyScalar(experiment.local.getComponent(index))));
+      return '输入 ' + pointTuple4(experiment.local) + '。三根轴乘过距离后，得到 ' + pieces.join(' + ') +
+        '。再加灯光原点 ' + tuple(lightOriginInWorld) + '，输出 ' + pointTuple4(experiment.world) + '。';
+    }
+    if (querying) {
+      const axis = axes[matrixRow];
+      const coord = ['灯光横向', '灯光高度', '灯光 Z'][matrixRow];
+      const offset = experiment.world.clone().sub(lightOriginInWorld);
+      return '先减原点 ' + tuple(experiment.world) + ' − ' + tuple(lightOriginInWorld) + ' = ' + tuple(offset) +
+        '。沿这根轴量位移，得到 ' + coord + ' = 位移 · ' + ['R', 'U', 'K'][matrixRow] +
+        '。矩阵这行直接算 (' + dotTerms(experiment.world, axis) + ') − (' + fmt(lightOriginInWorld.dot(axis)) +
+        ') = ' + fmt(experiment.local.getComponent(matrixRow)) + '。';
+    }
+    return '第四列前三项分别是 −R·O、−U·O、−K·O。它们把灯光原点的三个读数从结果里扣掉。';
+  }
+
+  function updateMatrixMap(experiment) {
+    const {uv, local, cell, gridRow, gridColumn} = experiment;
+    id('matrix-address').textContent = '投影换成图上的比例 (u, v) = (' + fmt(uv.x) + ', ' + fmt(uv.y) + ')。' +
+      (cell ? '选中' + gridAddress(gridRow, gridColumn) + '。' : '这个位置在阴影图覆盖范围之外。');
+    id('matrix-map-grid').replaceChildren(...samples.slice().reverse().flatMap((gridCells, index) =>
+      gridCells.map((sample, mapColumn) => {
+        const mapRow = rows - 1 - index;
+        const element = document.createElement('span');
+        element.className = 'matrix-map-cell';
+        element.textContent = ztext(sample.depth);
+        element.title = gridAddress(mapRow, mapColumn);
+        if (cell && gridRow === mapRow && gridColumn === mapColumn) element.setAttribute('aria-current', 'true');
+        return element;
+      })
+    ));
+    id('matrix-query').textContent = '离灯光前方 ' + fmt(-local.z) + ' 个单位，换成深度 ' + ztext(uv.z) + '。' +
+      (cell ? '这格保存 ' + ztext(cell.depth) + '。' + (uv.z > cell.depth + flatZ ? '点在格内记录的表面后方，判为阴影。' : '点通过深度比较，判为受光。') : '');
+  }
   const viewLessons = [
-    ['先认两点：都用世界坐标', '灰色 X、Y、Z 是世界的尺子。A 是方块顶面；O 是我们选的灯光视图参考点。O 的三个数也是用世界轴量出来的。', 'W 是世界原点；O 是灯光原点', [reading('A · 世界位置', tuple(A)), reading('O · 世界位置', tuple(O))], '这一步只认清两个点的位置，还没有换轴。'],
-    ['A − O：把箭头的尾巴放到 O', '从世界原点 W 到 A、到 O，是两支灰箭头。现在想要的是从 O 到 A 的金色箭头。每一维都用终点减起点。', 'q = A − O', [reading('q · 世界轴分量', tuple(q)), reading('逐项相减', '2.6 − 0；4 − 5.8；2 − 4')], 'q 的起点换成了 O；它的三个数依然按世界 X、Y、Z 记。把原点换到 O 并不会自动把轴转过去。'],
+    () => ['认清世界点 A 和参考原点 O', '灰色 X、Y、Z 是世界轴。A 在方块顶面，O 是示例给灯光视图选的原点。接着给灯光视图选出它自己的三根轴。', 'A 和 O 都按世界 X、Y、Z 读数', [reading('A · 世界位置', tuple(A), 'a'), reading('O · 示例直接设定', tuple(O))], '场景下方的参数区给出了 A 的默认构造和当前位置。'],
+    () => ['A − O：求从 O 指向 A 的位移 q', '从世界原点 W 到 A、到 O，是两支灰箭头。金色箭头从 O 出发，因此每一项用 A 的世界坐标减去 O 的世界坐标。', 'q = ' + tuple(A) + ' − ' + tuple(O) + ' = ' + tuple(q), [reading('q · 按世界 X、Y、Z 记', tuple(q), 'a')], '下一步用刚得到的 q 与右轴 R 做点积，读出第一项灯光坐标。'],
     ['先选光线方向：向右 3、向下 4', '图上浅蓝线从 O 指出去，沿世界 +X 走 3、沿世界 −Y 走 4。这是示例先选的方向。蓝色 F 是把这支长度为 5 的箭头缩成单位长度，方向没有变。', 'F = (3, −4, 0) ÷ √(3² + 4²) = (0.6, −0.8, 0)', [reading('先选 · 世界轴分量', tuple(lightDirection)), reading('算出 · 单位光线方向 F', tuple(F))], 'F 表示光往哪儿走。方向箭头的起点画在 O，只是为了对照接下来的三根灯光轴。'],
     ['把 F 反过来，就得到后轴 K', '光线往前走，图里的蓝色 K 朝相反方向。我们约定灯光坐标的正 Z 指向后方，所以 K 是这套坐标系的正 Z 轴。', 'K = −F = (−0.6, 0.8, 0)', [reading('F · 光线向前', tuple(F)), reading('K · 灯光后轴', tuple(backward))], 'F 和 K 都用世界 X、Y、Z 写。光线已经定了 K，但还没定画面哪边是上。'],
     ['再选画面哪边算「上」', '想象沿着光线举起相机：保持镜头朝向，你仍能转动机身。这里选世界 −Z 当画面上方。绿色 U 就是这根上轴。', 'U = (0, 0, −1)；U · K = 0', [reading('另选 · 灯光上轴 U', tuple(U)), reading('检查 · 与后轴夹角', '90°')], 'K 完全在世界 XY 平面内，Z 分量是 0；U 只沿世界 Z 轴，所以二者垂直。U 是示例选的，不能只凭光线方向算出来。'],
-    ['用上轴和后轴算出右轴 R', '绿色 U 和蓝色 K 定好后，按右手坐标系取 U × K。红色 R 是算出的右轴，它同时垂直于 U 和 K。', 'R = (0, 0, −1) × (−0.6, 0.8, 0) = (0.8, 0.6, 0)', [reading('R · 世界轴分量', tuple(R)), reading('U · 世界轴分量', tuple(U)), reading('K · 世界轴分量', tuple(backward))], 'R 的前两项是 0 − (−1) × 0.8 = 0.8、(−1) × (−0.6) − 0 = 0.6，第三项是 0。三根轴都用世界轴写，接下来才用它们去量 A。'],
-    ['只问一件事：A 在右轴上走了多少？', '从 A 向红色的右轴 R 作垂线，虚线落到 H。O 到 H 的红色段长 1，方向和 R 一样，所以灯光横坐标是 +1。', 'xₗ = q · R = 2.6 × 0.8 + (−1.8) × 0.6 + (−2) × 0 = 1', [reading('q 和 R 的输入', '都按世界轴记'), reading('输出 +1', '灯光右轴上的带符号长度')], '顺着箭头走，q = OH + HA。HA 与 R 垂直，夹角 90°，点积是 0。OH = 1 × R，而 R 长度是 1，所以 OH · R = 1。点积留下的是 OH，虚线那段不贡献横坐标。'],
-    ['再读上轴：向世界 −Z 走，就是灯光向上', '把 A 垂直投到绿色的 U 轴。这次红轴退到背景，绿色段表示从 O 沿 U 走了 2 个单位。q 的世界 Z 分量是 −2，恰好与 U 的方向一致。', 'yₗ = q · U = 2.6 × 0 + (−1.8) × 0 + (−2) × (−1) = 2', [reading('q 和 U 的输入', '都按世界轴记'), reading('输出 +2', '沿灯光上轴')], '同一支 q，换一把尺来量，得到的是另一个数。'],
-    ['读后轴：落点在轴的反方向', '蓝色 K 的箭头指向灯光后方，但垂足落在 O 的另一边。实际走了 3 个单位，方向是 −K，也就是光线前进方向。', 'zₗ = q · K = 2.6 × (−0.6) + (−1.8) × 0.8 + (−2) × 0 = −3', [reading('q 和 K 的输入', '都按世界轴记'), reading('输出 −3', '沿灯光后轴的反方向')], '负号只表示方向。灯光坐标 zₗ = −3，对应沿光线向前的距离 d = 3。'],
-    ['把三段接起来，正好走到同一个 A', '从 O 出发，顺着红段走 +1，顺着绿段走 +2，再沿蓝轴反方向走 3。三段接起来和金色箭头到达同一个 A。', 'q = 1 × R + 2 × U − 3 × K', [reading('同一支 q · 世界轴', tuple(q)), reading('同一支 q · 灯光轴', tuple(lightA))], '三个点积像三次独立读数。每次只读一根轴，因为另外两根和它垂直。把三个数并排写起来，才是「换轴」的结果。'],
-    ['把减原点和三次读数合成 V_light', '图上仍是原来的 O 和 A。把三个点积写成矩阵：前三行分别是 R、U、K（它们按世界轴写），最后一列的前三项负责减原点。', 'V_light × (A, 1) → (1, 2, −3, 1)', [reading('R 行', '0.8, 0.6, 0, −3.48'), reading('U 行', '0, 0, −1, 4'), reading('K 行', '−0.6, 0.8, 0, −4.64')], '例如第一行做的是 R · A − R · O，等于 R · (A − O)。第四行 (0, 0, 0, 1) 保持 w = 1。']
+    ['O 和 R、U、K 定义灯光坐标系', '绿色 U 和蓝色 K 定好后，按右手坐标系取 U × K，得到红色右轴 R。灯光坐标从 O 开始量，沿 R、U、K 的带符号距离分别记为 xₗ、yₗ、zₗ。', 'R = (0, 0, −1) × (−0.6, 0.8, 0) = (0.8, 0.6, 0)', [reading('O · 世界位置', tuple(O)), reading('R · 灯光 +xₗ', tuple(R)), reading('U · 灯光 +yₗ', tuple(U)), reading('K · 灯光 +zₗ', tuple(backward))], '接下来从 O 指向 A，再用三根轴量同一支位移。'],
+    rightAxisLesson,
+    () => viewAxisLesson(1, '点积读出上轴刻度 yₗ', '把同一支 q 投到绿色的 U 轴。U 指向世界 −Z，点积只取 q 的世界 Z 分量再乘 −1。', '滑块沿世界 X 移动，q 的世界 Z 分量保持 −2，所以这里仍读到 +2。'),
+    () => viewAxisLesson(2, '点积读出后轴刻度 zₗ', '把同一支 q 投到蓝色的 K 轴。这个例子里 A 的垂足落在 K 的反方向。', '沿光线向前的距离 d = −zₗ = ' + fmt(-lightA.z) + '，投影时会用到 d。'),
+    viewMatrixProjectPointLesson,
+    viewMatrixChangeOriginLesson,
+    viewMatrixCompareLesson,
+    () => viewMatrixRowLesson(0, '写出矩阵第一行，算灯光横坐标',
+      '矩阵的一行会把同一列的两个数相乘，再把乘积加起来。把 R 的 X、Y、Z 分量放进前三格，正好能和 A 的世界 X、Y、Z 相乘，算出 R · A。\n\n第四格要把固定的 −R · O 加进总和。乘法需要两个数，所以在输入 (X, Y, Z) 后补一个 1。第四格就能算 (−R · O) × 1，把原来的负数加进去，也就是扣掉 O 的旧刻度。',
+      '移动 A，表里输入的世界 X 会变。灯光原点 O 和输入末尾的 1 都固定，所以第四格的乘积保持不变。'),
+    () => viewMatrixRowLesson(1, '写出矩阵第二行，算灯光高度',
+      '把测量方向换成上轴 U，起点仍从世界原点移到灯光原点。前三格填 U 的三个世界分量，计算 U · A。第四格填 −U · O，乘输入末尾的 1。',
+      'U 朝世界 −Z，所以前两格的乘积为 0。A 和 O 的世界 Z 先各乘 −1，再相减，得到沿 U 的灯光高度。'),
+    () => viewMatrixRowLesson(2, '写出矩阵第三行，算灯光 Z',
+      '把测量方向换成后轴 K。前三格填 K 的三个世界分量，计算 K · A。第四格填 −K · O，扣掉灯光原点的旧刻度。',
+      'K 指向灯光后方。灯光 Z 为负数时，表示 A 在灯光原点的前方。下一阶段会把 −zₗ 当成向前量的深度。'),
+    viewMatrixResultLesson,
+    matrixFrameLesson,
+    matrixColumnLesson,
+    matrixForwardLesson,
+    matrixReverseLesson
   ];
+  const projectionRanges = [[-4, 4], [0, 8], [0, 10]];
+  const projectionInput = axis => axis === 2 ? -lightA.z : lightA.getComponent(axis);
+  function projectionAxisLesson(axis) {
+    const [min, max] = projectionRanges[axis];
+    const input = projectionInput(axis);
+    const output = ndcA.getComponent(axis);
+    const title = ['只换横向刻度', '只换纵向刻度', '只换深度刻度'][axis];
+    const before = ['xₗ', 'yₗ', 'd = −zₗ'][axis];
+    const after = ['x_NDC', 'y_NDC', 'z_NDC'][axis];
+    return [
+      title + ' · ' + fmt(input) + ' → ' + fmt(output),
+      'A 在旧尺上离起点 ' + fmt(input - min) + '，旧尺总长 ' + (max - min) + '。保留这个比例，从新尺的 −1 出发，沿总长 2 走同样的比例。',
+      after + ' = −1 + 2 × (' + fmt(input) + ' − (' + min + ')) / ' + (max - min) + ' = ' + fmt(output),
+      [reading('旧刻度', before + ' = ' + fmt(input)), reading('新刻度', after + ' = ' + fmt(output))],
+      axis === 2 ? '深度单独换算。正交投影的横、纵坐标只取决于灯光空间中的 xₗ 和 yₗ。' : '',
+      [min, max, (input - min) / (max - min)]
+    ];
+  }
   const projectionLessons = [
-    ['先看灯光坐标里的盒子', '现在用灯光轴当绘图坐标。线框是灯光要画的范围；金点 A 还在灯光坐标 (1, 2, −3)。此图的深度刻度用 d = −zₗ，方便从近到远数。', 'A · 灯光坐标 (1, 2, −3)', [reading('横向 xₗ', '−4 … +4'), reading('纵向 yₗ', '0 … 8'), reading('向前深度 d', '0 … 10')], '接下来只重标刻度。每次看一根尺，金点在这根尺上的相对位置保持不变。'],
-    ['只换横向刻度：1 → 0.25', '从左端 −4 走到 1，走了 5 格；总宽 8 格。把同一个位置搬到 −1 到 +1 的尺上，它仍在从左数 5/8 的地方。', 'x_NDC = −1 + 2 × 5/8 = 0.25', [reading('同一位置 · 旧刻度', 'xₗ = 1'), reading('同一位置 · 新刻度', 'x_NDC = 0.25')], '先减左端点，除以总宽得到比例；再把比例放进长度为 2、起点为 −1 的新尺。', [-4, 4, 5/8]],
-    ['只换纵向刻度：2 → −0.5', '从下端 0 到 2，走了总高度 8 的 1/4。新尺上的下端是 −1，向上走新长度 2 的 1/4，到 −0.5。', 'y_NDC = −1 + 2 × 2/8 = −0.5', [reading('同一位置 · 旧刻度', 'yₗ = 2'), reading('同一位置 · 新刻度', 'y_NDC = −0.5')], '这里新读数是负的，只表示位于新尺的中点以下；没有说 A 移动了。', [0, 8, 2/8]],
-    ['只换深度刻度：向前 3 → −0.4', '从近面 0 向远面 10 走，A 位于这段路的 3/10。教学示例把近面记为 −1、远面记为 +1。', 'z_NDC = −1 + 2 × 3/10 = −0.4', [reading('同一位置 · 旧刻度', 'd = 3'), reading('同一位置 · 新刻度', 'z_NDC = −0.4')], '横向和纵向都没有用到 d。这正是正交投影下，A 和 B 相隔再远也能重合的原因。', [0, 10, 3/10]],
-    ['合起来：三根尺都换成 −1 到 +1', '现在三维线框显示的是新刻度下的标准盒。默认位置下，A 和 B 的横、纵读数仍相同，只有深度不同。', 'P_light × (1, 2, −3, 1) = (0.25, −0.5, −0.4, 1)', [reading('A · NDC', tuple(ndcA))], '正交投影在这个例子里保持 w = 1，所以 GPU 除以 w 后，前三个读数不变。']
+    () => ['在灯光坐标系里看覆盖盒', '图中的 A 使用 V_light 输出的灯光坐标。横向沿 R，纵向沿 U，深度尺沿光线 −K。线框的六个边界由示例设定，投影矩阵 P_light 会把这些区间换成 −1 到 +1。', 'V_light 输出 → P_light 输入 ' + pointTuple4(lightA), [reading('横向 xₗ', '−4 … +4'), reading('纵向 yₗ', '0 … 8'), reading('向前深度 d = −zₗ', '0 … 10')], 'A 沿光线向前的距离 d = −zₗ = ' + fmt(-lightA.z) + '。'],
+    () => projectionAxisLesson(0),
+    () => projectionAxisLesson(1),
+    () => projectionAxisLesson(2),
+    () => ['合起来：三根尺都换成 −1 到 +1', '现在三维线框显示的是新刻度下的标准盒。A 的三个读数分别来自刚才的三次刻度换算。', 'P_light × ' + pointTuple4(lightA) + ' = ' + pointTuple4(ndcA), [reading('A · NDC', tuple(ndcA))], '正交投影在这个例子里保持 w = 1，所以 GPU 除以 w 后，前三个读数保持原值。']
   ];
+  const remapAxis = (label, axis) => label + ' = (' + fmt(ndcA.getComponent(axis)) + ' + 1) / 2 = ' + fmt(texA.getComponent(axis));
+  const uvA = () => '(' + fmt(texA.x) + ', ' + fmt(texA.y) + ')';
+  const texelFormula = (label, uv, size, index) => label + ' = ⌊' + fmt(uv) + ' × ' + size + '⌋ = ' + index;
   const textureLessons = [
-    ['把横向位置变成 u', '标准盒横轴从 −1 到 +1，但纹理按宽度比例从 0 到 1 寻址。A 的横向读数 0.25 位于旧尺的 5/8；在新尺上就直接记成 0.625。', 'u = (0.25 + 1) / 2 = 0.625', [reading('A · 横向比例', fmt(texA.x))], '下一个小步再读 v。u 还没有决定完整的格子位置。', [-1, 1, texA.x, 0, 1]],
-    ['把纵向位置变成 v', 'A 的纵向读数 −0.5 位于从下往上的 1/4。这时 u 和 v 已经足够把 A 定位到一格。', 'v = (−0.5 + 1) / 2 = 0.25', [reading('A · (u, v)', '(0.625, 0.25)'), reading('格子 · 从 0 数', '第 1 行、第 2 列')], '宽 4 格、高 6 格：0.625 × 4 = 2.5，0.25 × 6 = 1.5。两个数取整后分别是列号 2、行号 1。', [-1, 1, texA.y, 0, 1]],
-    ['把沿光线的位置变成待写深度', '深度也按 0 到 1 编码，近面是 0、远面是 1。A 在深度尺上的位置是 0.30；它不改变刚刚选好的格子。', 'z = (−0.4 + 1) / 2 = 0.30', [reading('选哪格', 'u = 0.625，v = 0.25'), reading('拿什么数来比较', 'z = 0.30')], '现在已经有候选深度，但纹素是否更新，还要看同一格有没有更近的一层。', [-1, 1, texA.z, 0, 1]]
+    () => ['把横向位置变成 u', '标准盒横轴用 −1 到 +1 的刻度，纹理用 0 到 1 的比例记录横向位置。', remapAxis('u', 0), [reading('A · 横向比例', fmt(texA.x))], '下一个小步用 u 和 v 一起定位纹素。', [-1, 1, texA.x, 0, 1]],
+    () => ['把纵向位置变成 v', '得到 v 之后，把 u 乘图宽、把 v 乘图高，再向下取整。行列从左下角数 0。', remapAxis('v', 1), [reading('A · (u, v)', uvA()), reading('A 落在哪格', gridAddress(rowA(), colA()))], texelFormula('列', texA.x, cols, colA()) + '，' + texelFormula('行', texA.y, rows, rowA()) + '。', [-1, 1, texA.y, 0, 1]],
+    () => ['把沿光线的位置变成 A 的深度', '把 A 的 NDC 深度换到近面 0、远面 1 的刻度。写图时，每格用中心射线上的最近命中点决定存多少。', remapAxis('z', 2), [reading('A 落在哪格', gridAddress(rowA(), colA())), reading('A 自身深度 z', fmt(texA.z))], onRayThroughA(samples[rowA()][colA()])
+      ? 'A 正在这格的中心射线上，是射线打到的方块顶面点。'
+      : 'A 在这格内偏离中心，格内存值取决于中心射线实际打到的表面。', [-1, 1, texA.z, 0, 1]]
   ];
   const lessons = {1: viewLessons, 2: projectionLessons, 3: textureLessons};
-  const lessonCount = () => (lessons[step]?.length ?? 2) + Number(step >= 3);
+  const course = [
+    [[0, '认识 A 和 B']],
+    [[0, '认识 A、O'], [2, '选光线方向 F'], [3, '求后轴 K'], [4, '选上轴 U'], [5, '定灯光坐标系'],
+      [1, '计算位移 q'], [6, '读右轴 xₗ'], [7, '读上轴 yₗ'], [8, '读后轴 zₗ'],
+      [viewMatrixSteps.projectPoint, '算 A 的投影刻度'], [viewMatrixSteps.changeOrigin, '把零点移到 O'],
+      [viewMatrixSteps.compare, '比较两种算法'], [viewMatrixSteps.rightRow, '写第一行 · 右轴'],
+      [viewMatrixSteps.upRow, '写第二行 · 上轴'], [viewMatrixSteps.backRow, '写第三行 · 后轴'],
+      [viewMatrixSteps.result, '合成 V_light 并验算']],
+    [[0, '认识覆盖盒'], [1, '换横向刻度'], [2, '换纵向刻度'], [3, '换深度刻度'], [4, '合成 NDC']],
+    [[0, '计算 u'], [1, '计算 v 并定位纹素'], [2, '计算 A 自身深度'], [3, '每格保存最近深度']],
+    [[0, '取得 B 的世界位置'], [1, '用 B 的 UV 找格'], [2, '比较两个深度']]
+  ];
+  const matrixTrack = [
+    [matrixSteps.frames, '看两套坐标怎样量位置'],
+    [matrixSteps.columns, '推导灯光到世界的矩阵'],
+    [matrixSteps.place, '用灯光坐标在场景里放标记'],
+    [matrixSteps.shadow, '用世界坐标查阴影图']
+  ];
+  const traceMarks = [[1, 1, q], [1, viewMatrixSteps.result, lightA, viewMatrixSteps.projectPoint], [2, 4, ndcA], [3, 2, texA]];
+  const track = () => matrixLesson() ? matrixTrack : course[step];
+  const stepIndex = () => track().findIndex(([number]) => number === micro);
+
+  function updateTrace() {
+    const input = viewLesson() && !matrixLesson() && micro >= 6 ? 0
+      : step === 2 ? 1
+      : textureLesson() ? 2
+      : writing() ? 3 : -1;
+    traceMarks.forEach(([stage, substep, value], index) => {
+      const reached = !matrixLesson() && (
+        step > stage || (step === stage && stepIndex() >= course[stage].findIndex(([number]) => number === substep)
+      ));
+      if (reached) unlockedTraceCount = Math.max(unlockedTraceCount, index + 1);
+      const button = traceButtons[index];
+      const ready = index < unlockedTraceCount;
+      button.dataset.ready = String(ready);
+      button.dataset.input = String(index === input);
+      button.querySelector('b').textContent = ready ? tuple(value) : '待推导';
+      if (stage === step && substep === micro) button.setAttribute('aria-current', 'step');
+      else button.removeAttribute('aria-current');
+    });
+  }
 
   const stages = [
-    ['01 / WORLD', '同一条光线上的两个点', 'A 在方块顶面，B 在地板上。默认位置下，蓝线从灯光一侧出发，先经过 A，再到 B。点「沿光线看」，观察它们怎样重叠。', '点的位置：世界坐标 (X, Y, Z)'],
-    ['02 / VIEW'],
-    ['03 / ORTHOGRAPHIC'],
-    ['04 / STORE', '每格写入遇到的最近深度', '网格是光线的入口。每格发出一条平行光线；图上数字是该格看到的最前一层深度。框出的是 B 对应的格。沿光线看是一张二维图，斜看能看到后面的空间。', '(u, v, z) = 0.5 × (NDC.xyz) + 0.5'],
-    ['05 / SAMPLE', '用 B 的世界位置查阴影', '相机画到 B 时，阴影查询仍用灯光坐标。u、v 选格；z 是 B 自己的参考深度。横移 B，看同一个点怎样从被遮挡变为受光。', '普通 Z：B 的参考深度 > 格内最近深度 → 被挡住']
+    ['世界坐标', '在世界空间找到 A 和 B'],
+    ['V · 换轴'],
+    ['P · 正交投影'],
+    ['写入深度', '每个纹素保留最近深度'],
+    ['读取阴影', '用 B 的深度和格内深度比较']
   ];
   function guide() {
-    const s = current(), B = s.land, bt = uvDepth(B);
-    const occluded = bt.z > s.depth + flatZ;
-    const clearToFloor = '1.00 → ' + ztext(s.groundDepth);
-    const writes = s.cubeDepth < s.groundDepth ? clearToFloor + ' → ' + ztext(s.depth) : clearToFloor;
+    const sample = current(), B = sample.land, bt = uvDepth(B);
+    const occluded = bt.z > sample.depth + flatZ;
+    const hitsBlock = sample.cubeDepth < sample.groundDepth;
+    const bDepth = -sample.start.y / F.y;
+    const comparison = ztext(bt.z) + (occluded ? ' > ' : ' = ') + ztext(sample.depth) + (occluded ? '，B 被方块挡住' : '，B 受光');
+    const address = gridAddress();
+    const worldExplanation = onRayThroughA(sample)
+      ? '这条中心射线先经过方块顶面的 A，再碰到地板上的 B。点「沿光线看」，观察两点怎样在灯光眼里重叠。'
+      : '金色虚线经过 A，蓝线经过 B，两条射线平行。点「沿光线看」，观察它们在灯光视角里的间隔。';
+    const descriptions = [
+      [worldExplanation, 'A 是方块顶面点，B 是选中纹素的中心射线与地板的交点。'],
+      [], [],
+      ['从每个纹素的中心沿光线方向找交点。框选的是当前观察格，换一列可以看见别的射线命中了什么。', hitsBlock
+        ? 'min(初始值 1.00, 地板 ' + ztext(sample.groundDepth) + ', 方块 ' + ztext(sample.cubeDepth) + ') = ' + ztext(sample.depth)
+        : 'min(初始值 1.00, 地板 ' + ztext(sample.groundDepth) + ') = ' + ztext(sample.depth)],
+      ['B 的 UV 已经选好纹素。普通 Z 下数值越小越靠近灯光。如果这格保存的深度比 B 小，光就在到达 B 前被挡住。', comparison]
+    ];
     const values = [
       [['A · 世界', tuple(A), 'a'], ['B · 世界', tuple(B), 'b']],
-      [],
-      [],
-      [['B · UV', '(' + fmt(bt.x) + ', ' + fmt(bt.y) + ')', 'b'], ['同一格先后写入', writes, '']],
-      [['B · (u, v, z)', tuple(bt), 'b'], ['格内存储深度', ztext(s.depth), ''], ['深度比较', ztext(bt.z) + (occluded ? ' > ' : ' = ') + ztext(s.depth) + (occluded ? ' · 被挡住' : ' · 受光'), '']]
+      [], [],
+      [reading('A 落在哪格', gridAddress(rowA(), colA()) + ' · z = ' + fmt(texA.z), 'a'), reading('当前观察格', address), reading('射线命中', hitsBlock ? '方块与地板' : '地板'),
+        reading('地板深度 · d / 10', fmt(bDepth) + ' / 10 = ' + ztext(sample.groundDepth)),
+        reading('格内保存', ztext(sample.depth), 'a')],
+      [reading('B 查哪一格', address, 'b'), reading('UV 选格 / z 比深度', tuple(bt), 'b')]
     ];
-    const lesson = lessons[step]?.[micro] ?? (step === 4 && micro < 2 ? [
-      ['相机画到 B：先拿到它的世界位置', '游戏相机只决定正在画哪个屏幕像素。假设这个像素看到的是地板 B；我们先拿到 B 的世界坐标。图里的观察镜头可以随意旋转，B 的位置不因此改变。', '阴影查询的输入：B · 世界位置', [reading('B · 世界位置', tuple(B))], '下一步才用灯光的 V、P 和纹理变换，回答 B 从灯光看落在哪儿。'],
-      ['把 B 也换到灯光的纹理坐标', '对 B 做与 A 相同的换轴、投影和刻度变换。前两个数只用于选格；最后一个数是 B 本身的深度，还没有和纹理里的值比较。', 'B · 世界 → 灯光 → NDC → (u, v, z)', [reading('B · 灯光', tuple(B.clone().applyMatrix4(V))), reading('B · NDC', tuple(B.clone().applyMatrix4(PV))), reading('B · (u, v, z)', tuple(bt)), reading('选中的格 · 从 0 数', '第 ' + row + ' 行、第 ' + column + ' 列')], '沿光线看时，亮框就是 B 要查的那一格。']
+    const showPointTrial = pointTrialActive();
+    id('point-trial').hidden = !showPointTrial;
+    id('point-x-value').textContent = 'X = ' + fmt(A.x);
+    const stageLesson = lessons[step]?.[micro];
+    const lesson = (typeof stageLesson === 'function' ? stageLesson() : stageLesson) ?? (step === 4 && micro < 2 ? [
+      ['取得地板点 B 的世界位置', '假设相机正在渲染地板上的 B，阴影查询从它的世界坐标开始。为了方便核对，这里让 B 落在当前纹素的中心射线上。', 'B = 射线起点 + ' + fmt(bDepth) + 'F', [reading('近面起点 · 世界', tuple(sample.start)), reading('前进距离 d', '−' + fmt(sample.start.y) + ' / (' + fmt(F.y) + ') = ' + fmt(bDepth)), reading('B · 世界位置', tuple(B), 'b')], '地板满足世界 Y = 0。沿 F 前进 d 后，高度为起点 Y + d × Fᵧ。令高度为 0，就求出了 d。'],
+      ['用 B 的纹理坐标选格', 'B 和 A 使用同一套灯光坐标变换。用 u 乘图宽、v 乘图高，再分别向下取整得到列和行。', '列 = ⌊' + fmt(bt.x) + ' × ' + cols + '⌋ = ' + column + '　行 = ⌊' + fmt(bt.y) + ' × ' + rows + '⌋ = ' + row,
+        [reading('B · 世界 → V', tuple(B) + ' → ' + tuple(B.clone().applyMatrix4(V)), 'b'), reading('B · P 投影 → NDC', tuple(B.clone().applyMatrix4(PV))), reading('B · NDC 换到 [0, 1]', tuple(bt), 'b')], '亮框选中 ' + address + '。z = ' + ztext(bt.z) + ' 是 B 自身的深度，下一步用它与这一格的数值比较。']
     ][micro] : undefined);
-    const [tag, title, desc, formula] = lesson ? [stages[step][0], ...lesson] : stages[step];
-    id('tag').textContent = tag;
+    const [title, desc, formula] = lesson ?? [stages[step][1], ...descriptions[step]];
+    id('tag').textContent = matrixLesson() ? '补充实验 · 矩阵互转' : stages[step][0];
     id('stage-title').textContent = title;
     id('explain').textContent = desc;
     id('formula').textContent = formula;
-    id('scene-tag').textContent = ['世界轴 XYZ', '固定在世界空间观察', projectLesson() ? '灯光空间 · 逐轴读刻度' : '标准盒 NDC', textureLesson() ? '从标准盒到纹理' : '4 × 6 深度图', ['世界空间 · 找到 B','定位 B 要查的格','参考深度 vs 存储深度'][micro]][step];
+    id('formula').hidden = !formula;
+    id('lesson-guide').classList.toggle('view-derivation', viewDerivation());
+    id('scene-tag').textContent = ['世界轴 XYZ', matrixLesson() ? '世界空间 · 两套坐标轴' : '固定在世界空间观察', projectLesson() ? '灯光空间 · 逐轴读刻度' : '标准盒 NDC', textureLesson() ? '从标准盒到纹理' : '4 × 6 深度图', ['世界空间 · 找到 B','定位 B 要查的格','参考深度 vs 存储深度'][micro]][step];
+    updateMatrixGuide();
+    updateViewMatrixRow();
     id('values').replaceChildren(...(lesson?.[3] ?? values[step]).map(([name, value, cls]) => {
       const div = document.createElement('div');
       div.className = 'value ' + cls;
@@ -4514,8 +5191,9 @@ void main() {
       return div;
     }));
     const detail = id('micro-detail');
-    detail.hidden = !lesson;
-    detail.textContent = lesson?.[4] ?? '';
+    detail.textContent = lesson?.[4] ?? (writing()
+      ? '射线命中地板时的 d 来自世界 Y = 0 的交点，除以覆盖盒深度 10，得到 [0, 1] 的深度。' : '');
+    detail.hidden = !detail.textContent;
     const ruler = lesson?.[5];
     id('ruler').hidden = !ruler;
     if (ruler) {
@@ -4524,26 +5202,50 @@ void main() {
       id('ruler-max').textContent = max + ' → ' + newMax;
       id('ruler-track').style.setProperty('--at', 100 * at + '%');
     }
-    id('micro').hidden = !hasLesson();
-    if (hasLesson()) {
-      id('micro-status').textContent = ['','V · 换轴','P · 投影','写入深度','读取阴影'][step] + ' / 小步 ' + (micro + 1) + ' / ' + lessonCount();
-      id('micro-prev').disabled = micro === 0;
-      id('micro-next').textContent = micro === lessonCount() - 1 ? (step === 4 ? '已到最后一步' : '下一阶段 →') : '下一小步 →';
-      id('micro-next').disabled = step === 4 && micro === lessonCount() - 1;
-    }
+    updateTrace();
+    updateNavigation();
     id('along').hidden = viewLesson() || projectLesson() || textureLesson();
     id('oblique').textContent = viewLesson() || projectLesson() || textureLesson() ? '恢复讲解视角' : '斜看场景';
-    document.querySelector('.trial').hidden = Boolean(lesson);
+    id('probe-trial').hidden = step !== 0 && step !== 4 && !writing();
+    id('probe-label').textContent = writing() ? '查看哪一列的写入结果' : '地板点 B 横移';
+    id('probe-hint').textContent = writing() ? '整张图按同一个规则写入。滑块切换当前观察的纹素。' : '试试从第 2 列移到第 3 列，比较这两格的深度。';
     document.querySelector('.legend').hidden = Boolean(lesson);
-    id('probe-value').textContent = '第 ' + column + ' 列 · u = ' + fmt(bt.x);
+    id('probe-value').textContent = address;
+    id('setup-a').textContent = '默认 A = ' + tuple(defaultA) + '，当前 A = ' + tuple(A) + '。';
+    id('setup-b').textContent = address + '的近面中心在灯光坐标 (' + fmt(sample.x) + ', ' + fmt(sample.y) + ', 0)，世界坐标 ' + tuple(sample.start) + '。沿 F 前进到世界 Y = 0，得到 B = ' + tuple(B) + '。';
+    id('depth-compare').hidden = step !== 4 || micro !== 2;
+    id('map-depth').textContent = ztext(sample.depth);
+    id('probe-depth').textContent = ztext(bt.z);
+    id('map-bar').style.setProperty('--depth', 100 * sample.depth + '%');
+    id('probe-bar').style.setProperty('--depth', 100 * bt.z + '%');
     buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === step)));
+  }
+
+  function updateNavigation() {
+    const options = track();
+    const index = stepIndex();
+    const atEnd = index === options.length - 1;
+    if (stepSelect.options[0]?.textContent !== options[0][1]) {
+      stepSelect.replaceChildren(...options.map(([number, label]) => new Option(label, number)));
+    }
+    stepSelect.value = micro;
+    id('micro-status').textContent = (index + 1) + ' / ' + options.length;
+    id('matrix-return').hidden = !matrixLesson();
+    id('matrix-jump').hidden = matrixLesson();
+    id('micro-prev').disabled = (step === 0 || matrixLesson()) && index === 0;
+    id('micro-next').disabled = step === 4 && atEnd;
+    id('micro-next').textContent = !atEnd ? '下一步 →' :
+      matrixLesson() ? '返回主线 →' : step === 4 ? '已到最后一步' : '下一阶段 →';
+    id('reading-prev').disabled = id('micro-prev').disabled;
+    id('reading-next').disabled = id('micro-next').disabled;
+    id('reading-next').textContent = id('micro-next').textContent;
   }
 
   let renderer;
   try {
     renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
   } catch {
-    id('fallback').textContent = '当前浏览器无法启动 WebGL 2，仍可切换步骤、移动 B 查看数值。';
+    id('fallback').textContent = '当前浏览器无法启动 WebGL 2。可切换步骤和移动滑块查看数值。';
   }
   let scene, objects, camera, controls, labels = [], width = 0, height = 0;
   const asCameraPoint = v(0, 0, 0);
@@ -4630,7 +5332,7 @@ void main() {
   }
   function drawBlock() {
     const size = block.getSize(v(0, 0, 0)), center = block.getCenter(v(0, 0, 0));
-    const geom = new T.BoxGeometry(size.x, size.y, size.z).translate(...center.toArray()).applyMatrix4(spaces[step]);
+    const geom = new T.BoxGeometry(size.x, size.y, size.z).translate(...center.toArray()).applyMatrix4(sceneTransform());
     add(new T.Mesh(geom, new T.MeshLambertMaterial({color: 0x9a6a35})));
     add(new T.LineSegments(new T.EdgesGeometry(geom), new T.LineBasicMaterial({color: 0xe4b96b, transparent: true, opacity: .65})));
   }
@@ -4672,7 +5374,166 @@ void main() {
   const axisColors = [0xff8e7e, 0x75ddaa, 0x85afff];
   const axes = [R, U, backward];
   const axisNames = ['R · 右', 'U · 上', 'K · 后'];
+  function drawMatrixLesson() {
+    const experiment = matrixExperiment();
+    const building = micro === matrixSteps.columns;
+    const querying = micro === matrixSteps.shadow;
+    const activeAxis = building ? matrixColumn : querying ? matrixRow : -1;
+    if (!building) {
+      drawBlock();
+      for (const lineIndex of [0, 2, 4, 6]) {
+        line(v(lineIndex, 0, -2), v(lineIndex, 0, 5), colors.grid);
+      }
+      for (const lineIndex of [-2, 0, 2, 4]) {
+        line(v(-1, 0, lineIndex), v(7, 0, lineIndex), colors.grid);
+      }
+    }
+    originHandles.forEach((_, index) => arrow(worldOrigin, originHandlePoint(index), 0xa3b7b1, .15, true));
+    axes.forEach((axis, index) => {
+      const tip = O.clone().addScaledVector(axis, index === 0 ? 1.95 : 1.45);
+      arrow(O, tip, axisColors[index], .14, true);
+      pin(axisNames[index], tip);
+    });
+    point(worldOrigin, 'W · 世界原点', 0xb1bfbd, '');
+    point(O, 'O · 灯光原点', 0xe2e8e0, '');
+    if (building || micro === matrixSteps.place) arrow(worldOrigin, O, 0xb1bfbd, .16, true);
+    const {local, scenePoint} = experiment;
+    if (!building || matrixColumn !== 3) {
+      point(scenePoint, building ? '一格后的点' : experiment.useFloor ? '地板点 B' : '标记', colors.a, 'a');
+    }
+    if (building) {
+      if (matrixColumn < 3) arrow(O, scenePoint, axisColors[matrixColumn], .20, true);
+      return;
+    }
+    if (micro === matrixSteps.frames) {
+      line(worldOrigin, scenePoint, 0x9baea7, {dashed:true, overlay:true});
+      line(O, scenePoint, colors.a, {dashed:true, overlay:true});
+    } else if (micro === matrixSteps.place) {
+      let start = O;
+      axes.forEach((axis, index) => {
+        const end = start.clone().addScaledVector(axis, local.getComponent(index));
+        arrow(start, end, axisColors[index], .16, true);
+        start = end;
+      });
+    } else if (querying) {
+      drawMatrixShadow(experiment);
+      if (id('matrix-derivation').open) {
+        const foot = O.clone().addScaledVector(axes[matrixRow], local.getComponent(matrixRow));
+        arrow(O, foot, axisColors[activeAxis], .15, true);
+        line(scenePoint, foot, 0xe4eeea, {dashed:true, overlay:true});
+        pin('沿轴读数 ' + signed(local.getComponent(matrixRow)), foot, 'measure');
+      }
+    }
+  }
+  function drawMatrixShadow({local, scenePoint, cell, gridRow, gridColumn}) {
+    const planePoint = (x, y) => fromLight(x, y, 0);
+    const cellWidth = 8 / cols, cellHeight = 8 / rows;
+    for (let colIndex = 0; colIndex <= cols; colIndex++) {
+      const x = -4 + colIndex * cellWidth;
+      line(planePoint(x, 0), planePoint(x, 8), colors.frame, {opacity:.65});
+    }
+    for (let rowIndex = 0; rowIndex <= rows; rowIndex++) {
+      const y = rowIndex * cellHeight;
+      line(planePoint(-4, y), planePoint(4, y), colors.frame, {opacity:.65});
+    }
+    if (!cell) return;
+    const left = -4 + gridColumn * cellWidth, bottom = gridRow * cellHeight;
+    const corners = [planePoint(left, bottom), planePoint(left + cellWidth, bottom),
+      planePoint(left + cellWidth, bottom + cellHeight), planePoint(left, bottom + cellHeight)];
+    poly(corners, colors.a, .35);
+    corners.forEach((corner, index) => line(corner, corners[(index + 1) % corners.length], colors.a, {overlay:true}));
+    const hit = planePoint(local.x, local.y);
+    point(hit, '阴影图上的落点', colors.b, 'b');
+    arrow(hit, scenePoint, colors.ray, .18, true);
+  }
+  function originHandlePoint(index) {
+    const end = worldOrigin.clone();
+    return end.setComponent(index, end.getComponent(index) + 1.65);
+  }
+  function projectHandle(point) {
+    const projected = point.clone().project(camera);
+    return {
+      x: (projected.x + 1) * width / 2,
+      y: (1 - projected.y) * height / 2,
+      visible: Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1 && Math.abs(projected.z) <= 1
+    };
+  }
+  function positionOriginHandles() {
+    if (!matrixLesson()) return;
+    originHandles.forEach((handle, index) => {
+      const position = projectHandle(originHandlePoint(index));
+      handle.hidden = !position.visible;
+      handle.style.left = position.x + 'px';
+      handle.style.top = position.y + 'px';
+    });
+  }
+  function setWorldOrigin() {
+    worldOrigin.set(...originSliders.map(slider => slider.valueAsNumber));
+    lightOriginInWorld.copy(O).sub(worldOrigin);
+    matrixLightToWorld.setPosition(lightOriginInWorld);
+    matrixWorldToLight.copy(matrixLightToWorld).invert();
+    guide();
+    rebuild();
+  }
+  function beginOriginDrag(event) {
+    if (event.button !== 0 || originDrag) return;
+    const handle = event.currentTarget;
+    const index = Number(handle.dataset.originHandle);
+    const start = projectHandle(worldOrigin);
+    const end = projectHandle(originHandlePoint(index));
+    const dx = end.x - start.x, dy = end.y - start.y;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared < 16) return;
+    originDrag = {index, pointer: event.pointerId, x: event.clientX, y: event.clientY, dx, dy,
+      scale: 1.65 / lengthSquared, value: originSliders[index].valueAsNumber};
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+  function dragOrigin(event) {
+    if (originDrag?.pointer !== event.pointerId) return;
+    const {index, x, y, dx, dy, scale, value} = originDrag;
+    const slider = originSliders[index];
+    const next = value + ((event.clientX - x) * dx + (event.clientY - y) * dy) * scale;
+    slider.value = next;
+    if (slider.valueAsNumber !== worldOrigin.getComponent(index)) setWorldOrigin();
+  }
+  function endOriginDrag(event) {
+    if (originDrag?.pointer === event.pointerId) originDrag = undefined;
+  }
+  function drawWorldRightProjection(showOrigin) {
+    const worldZero = v(0, 0, 0);
+    const pointProjection = R.dot(A);
+    const originProjection = R.dot(O);
+    const axisEnd = R.clone().multiplyScalar(Math.max(pointProjection, originProjection) + .8);
+    const pointFoot = R.clone().multiplyScalar(pointProjection);
+    arrow(worldZero, axisEnd, axisColors[0], .18, true);
+    pin('W', worldZero);
+    pin('沿 R →', axisEnd);
+    point(A, 'A', colors.a, 'a');
+    line(A, pointFoot, colors.a, {dashed:true, overlay:true});
+
+    if (showOrigin) {
+      const originFoot = R.clone().multiplyScalar(originProjection);
+      point(O, 'O', 0xe2e8e0, '');
+      line(O, originFoot, 0xe2e8e0, {dashed:true, overlay:true});
+      if (fmt(lightA.x) === '0') {
+        point(pointFoot, 'A′ = O′', colors.a, 'a');
+        return;
+      }
+      point(originFoot, 'O′', 0xe2e8e0, '');
+      arrow(originFoot, pointFoot, colors.a, .15, true);
+    }
+    point(pointFoot, 'A′', colors.a, 'a');
+  }
   function drawViewLesson() {
+    if (matrixLesson()) {
+      drawMatrixLesson();
+      return;
+    }
+    if (micro === viewMatrixSteps.projectPoint || micro === viewMatrixSteps.changeOrigin) {
+      drawWorldRightProjection(micro === viewMatrixSteps.changeOrigin);
+      return;
+    }
     const W = v(0, 0, 0);
     if (micro < 6) {
       [[v(2.2, 0, 0), 'X'], [v(0, 2.1, 0), 'Y'], [v(0, 0, 2.05), 'Z']].forEach(([end, name]) => {
@@ -4687,7 +5548,7 @@ void main() {
       arrow(W, A, 0x8a9b9c, .19, true);
       arrow(W, O, 0x8a9b9c, .19, true);
     }
-    point(O, 'O', 0xe2e8e0, '');
+    point(O, micro === 5 ? 'O · 灯光原点' : 'O', 0xe2e8e0, '');
     point(A, 'A', colors.a, 'a');
     if (micro === 1 || micro >= 6) {
       arrow(O, A, colors.a, .21, true);
@@ -4709,14 +5570,16 @@ void main() {
         shown.forEach(i => {
           const end = O.clone().add(axes[i]);
           arrow(O, end, axisColors[i], .16, true);
-          pin(axisNames[i], end);
+          pin(micro === 5 ? ['R · +xₗ', 'U · +yₗ', 'K · +zₗ'][i] : axisNames[i], end);
         });
       }
     }
-    if (micro >= 6 && micro <= 8) {
-      const active = micro - 6;
+    let active = viewMatrixRowSteps.indexOf(micro);
+    if (micro >= 6 && micro <= 8) active = micro - 6;
+    if (micro === viewMatrixSteps.compare) active = 0;
+    if (active >= 0) {
       const axis = axes[active];
-      const n = q.dot(axis);
+      const n = lightA.getComponent(active);
       const foot = O.clone().addScaledVector(axis, n);
       const positive = O.clone().addScaledVector(axis, Math.max(2.25, n + .8));
       const negative = O.clone().addScaledVector(axis, Math.min(-.6, n - .35));
@@ -4724,19 +5587,21 @@ void main() {
       pin(axisNames[active] + ' →', positive);
       arrow(O, foot, axisColors[active], .17, true);
       line(A, foot, 0xe4eeea, {dashed:true, overlay:true});
-      const along = axis.clone().multiplyScalar(-Math.sign(n) * .21);
+      const along = axis.clone().multiplyScalar(n > 0 ? -.21 : .21);
       const across = A.clone().sub(foot).normalize().multiplyScalar(.21);
       const corner = foot.clone().add(along).add(across);
       line(foot.clone().add(along), corner, 0xe4eeea, {overlay:true});
       line(corner, foot.clone().add(across), 0xe4eeea, {overlay:true});
-      pin('H · ' + ['+1', '+2', '−3'][active], foot, 'measure');
+      const mark = signed(n);
+      pin(mark === '0' ? 'H = O · 0' : 'H · ' + mark, foot, 'measure');
     }
-    if (micro >= 9) {
+    if (micro === viewMatrixSteps.result) {
       let begin = O.clone();
       axes.forEach((axis, i) => {
-        const end = begin.clone().addScaledVector(axis, q.dot(axis));
+        const amount = lightA.getComponent(i);
+        const end = begin.clone().addScaledVector(axis, amount);
         arrow(begin, end, axisColors[i], .18, true);
-        pin(['+1 · R', '+2 · U', '−3 · K'][i], begin.clone().lerp(end, .5), 'measure');
+        pin(signed(amount) + ' · ' + ['R', 'U', 'K'][i], begin.clone().lerp(end, .5), 'measure');
         begin = end;
       });
     }
@@ -4754,14 +5619,14 @@ void main() {
       [v(-4.4, 0, .6), v(-4.4, 8, .6)],
       [v(-4.4, -1.1, 0), v(-4.4, -1.1, -10)]
     ];
-    const [start, end] = endpoints[micro - 1];
-    const f = projectionLessons[micro][5][2];
-    const mark = start.clone().lerp(end, f);
-    arrow(start, end, axisColors[micro - 1], .24, true);
+    const axis = micro - 1;
+    const [start, end] = endpoints[axis];
+    const mark = start.clone().lerp(end, texA.getComponent(axis));
+    arrow(start, end, axisColors[axis], .24, true);
     line(a, mark, 0xe4eeea, {dashed:true, overlay:true});
-    point(mark, ['1 → 0.25','2 → −0.5','3 → −0.4'][micro - 1], colors.a, 'q');
-    pin(['−4 → −1','0 → −1','近 0 → −1'][micro - 1], start);
-    pin(['+4 → +1','8 → +1','远 10 → +1'][micro - 1], end);
+    point(mark, fmt(projectionInput(axis)) + ' → ' + fmt(ndcA.getComponent(axis)), colors.a, 'q');
+    pin(['−4 → −1','0 → −1','近 0 → −1'][axis], start);
+    pin(['+4 → +1','8 → +1','远 10 → +1'][axis], end);
   }
   function drawTextureLesson() {
     drawFrustum();
@@ -4773,7 +5638,7 @@ void main() {
       pin('远 1', v(-4, -4, -4));
       const mark = v(-4, -4, a.z);
       line(a, mark, 0xe4eeea, {dashed:true, overlay:true});
-      point(mark, 'z = 0.30', colors.a, 'q');
+      point(mark, 'z = ' + fmt(texA.z), colors.a, 'q');
       return;
     }
     for (let i = 1; i < cols; i++) {
@@ -4785,19 +5650,18 @@ void main() {
       line(v(-4, y, 4), v(4, y, 4), colors.frame, {opacity:.65});
     }
     if (micro === 1) {
-      const colA = Math.floor(texA.x * cols), rowA = Math.floor(texA.y * rows);
-      const x = -4 + colA * 8 / cols, y = -4 + rowA * 8 / rows;
+      const x = -4 + colA() * 8 / cols, y = -4 + rowA() * 8 / rows;
       const dx = 8 / cols, dy = 8 / rows;
       poly([v(x,y,4),v(x+dx,y,4),v(x+dx,y+dy,4),v(x,y+dy,4)], colors.a, .3);
     }
     line(a, front, 0xe4eeea, {dashed:true, overlay:true});
     line(front, v(front.x, -4, 4), axisColors[0], {dashed:true, overlay:true});
     arrow(v(-4, -4, 4), v(4, -4, 4), axisColors[0], .24, true);
-    pin('u = 0.625', v(front.x, -4, 4), 'measure');
+    pin('u = ' + fmt(texA.x), v(front.x, -4, 4), 'measure');
     if (micro === 1) {
       line(front, v(-4, front.y, 4), axisColors[1], {dashed:true, overlay:true});
       arrow(v(-4, -4, 4), v(-4, 4, 4), axisColors[1], .24, true);
-      pin('v = 0.25', v(-4, front.y, 4), 'measure');
+      pin('v = ' + fmt(texA.y), v(-4, front.y, 4), 'measure');
     }
   }
   function makeTexture() {
@@ -4873,7 +5737,7 @@ void main() {
     drawAxes();
     drawTexture();
     const s = current();
-    const start = fromLight(s.x, s.y, 0);
+    const start = s.start;
     const stop = s.cube || s.land;
     const beg = project(start), first = project(stop), end = project(s.land);
     line(beg, first, colors.ray, {overlay:true});
@@ -4881,9 +5745,9 @@ void main() {
     const rayTail = rayTip.clone().lerp(beg, .17);
     arrow(rayTail, rayTip, colors.ray, .22);
     if (s.cube) line(first, end, colors.ray, {dashed:true, opacity:.77, overlay:true});
-    if (step >= 1 && step <= 2 && column !== 2) {
-      const aStart = project(fromLight(1, 2, 0));
-      line(aStart, project(A), colors.a, {dashed:true, opacity:.62});
+    if (step <= 2 && !onRayThroughA(s)) {
+      const aStart = project(fromLight(lightA.x, lightA.y, 0));
+      line(aStart, project(A), colors.a, {dashed:true, opacity:.8, overlay:true});
     }
     point(project(A), 'A', colors.a, 'a');
     point(end, 'B', colors.b, 'b');
@@ -4898,7 +5762,11 @@ void main() {
     if (!renderer) return;
     controls?.dispose();
     let target, offset;
-    if (viewLesson()) {
+    if (matrixLesson()) {
+      target = v(2.1, 4.2, .2);
+      offset = v(2, 12, 11);
+      camera.up.set(0, 1, 0);
+    } else if (viewLesson()) {
       target = v(1.35, 3.25, 2.2);
       offset = v(9, 5.5, 13);
       camera.up.set(0, 1, 0);
@@ -4929,19 +5797,48 @@ void main() {
     needsFrame = true;
   }
   function positionPins(front) {
-    for (const {text, p, node} of labels) {
+    const spaceLabels = matrixLesson();
+    const placedLabels = spaceLabels ? originHandles.filter(handle => !handle.hidden).map(handle => {
+      const left = handle.offsetLeft - handle.offsetWidth / 2;
+      const top = handle.offsetTop - handle.offsetHeight / 2;
+      return {left, top, right: left + handle.offsetWidth, bottom: top + handle.offsetHeight};
+    }) : [];
+    const isSampleLabel = ({node}) => node.matches('.a,.measure');
+    const orderedLabels = spaceLabels
+      ? [...labels.filter(isSampleLabel), ...labels.filter(label => !isSampleLabel(label))]
+      : labels;
+    for (const {text, p, node} of orderedLabels) {
       asCameraPoint.copy(p).project(camera);
       const x = (asCameraPoint.x + 1) * width / 2;
       const y = (1 - asCameraPoint.y) * height / 2;
       const isPoint = text === 'A' || text === 'B';
-      const both = front && column === 2 && step < 3;
+      const both = front && step < 3 && onRayThroughA(current());
       const label = both && text === 'A' ? 'A / B' : text;
       if (node.textContent !== label) node.textContent = label;
       node.hidden = x < 0 || x > width || y < 0 || y > height || asCameraPoint.z > 1 ||
         (both && text === 'B') || (front && step >= 3 && isPoint);
       if (!node.hidden) {
-        const ox = Math.min(Math.max(5, x + 7), width - node.offsetWidth - 5);
-        const oy = Math.min(Math.max(width < 460 ? 63 : 41, y - 20), height - 48);
+        const labelWidth = node.offsetWidth, labelHeight = node.offsetHeight;
+        const minY = width < 460 ? 63 : 41;
+        let ox = Math.min(Math.max(5, x + 7), width - labelWidth - 5);
+        let oy = Math.min(Math.max(minY, y - 20), height - 48);
+        if (spaceLabels) {
+          const nearby = [-20, 5, 30, 55, 80].flatMap(dy => [7, -labelWidth - 7].map(dx => {
+            const left = Math.min(Math.max(5, x + dx), width - labelWidth - 5);
+            const top = Math.min(Math.max(minY, y + dy), height - labelHeight - 8);
+            return {left, top, right: left + labelWidth, bottom: top + labelHeight};
+          }));
+          const slot = nearby.find(({left, top, right, bottom}) => placedLabels.every(label =>
+            right + 3 <= label.left || left - 3 >= label.right || bottom + 3 <= label.top || top - 3 >= label.bottom
+          ));
+          if (!slot) {
+            node.hidden = true;
+            continue;
+          }
+          placedLabels.push(slot);
+          ox = slot.left;
+          oy = slot.top;
+        }
         node.style.transform = 'translate(' + Math.round(ox) + 'px,' + Math.round(oy) + 'px)';
       }
     }
@@ -4952,7 +5849,8 @@ void main() {
     height = viewport.clientHeight;
     if (!width || !height) return;
     const aspect = width / height;
-    const half = (viewLesson() ? 4.5 : projectLesson() ? 7.7 : width < 400 ? 7.15 : 6.6) * Math.max(1, 1 / aspect);
+    const viewSize = matrixLesson() ? 6.2 : viewLesson() ? 4.5 : projectLesson() ? 7.7 : width < 400 ? 7.15 : 6.6;
+    const half = viewSize * Math.max(1, 1 / aspect);
     camera.left = -half * aspect;
     camera.right = half * aspect;
     camera.top = half;
@@ -4971,46 +5869,146 @@ void main() {
     const hidePoints = front && step >= 3;
     for (const o of objects.children) if (o.renderOrder === 3 || o.renderOrder === 5) o.visible = !hidePoints;
     renderer.render(scene, camera);
+    positionOriginHandles();
     positionPins(front);
   }
-  function selectStage(i) {
-    if (i === step) return;
-    step = i;
-    micro = 0;
+  function showLesson(stage, substep) {
+    if (stage === step && substep === micro) return;
+    const enteringMatrix = stage === 1 && substep >= matrixSteps.frames;
+    const resetCamera = stage !== step || stage >= 3 || enteringMatrix !== matrixLesson() || (step === 2 && projectLesson() !== (substep < 4));
+    step = stage;
+    micro = substep;
+    id('matrix-derivation').open = stage === 1 && (substep === viewMatrixSteps.result || substep === matrixSteps.columns);
     guide();
     rebuild();
-    moveCamera(false);
-    resize();
+    if (resetCamera) {
+      moveCamera(writing() || (step === 4 && micro === 1));
+      resize();
+    }
+  }
+  function scrollBelowTrace(target = id('lesson-start')) {
+    target.style.scrollMarginTop = (document.querySelector('.trace').offsetHeight + 8) + 'px';
+    target.scrollIntoView({block: 'start'});
+  }
+  function leaveMatrix() {
+    const [stage, substep] = matrixReturn;
+    showLesson(stage, substep);
+    scrollBelowTrace();
+    id('micro-next').focus({preventScroll: true});
   }
   function changeMicro(delta) {
-    if (!hasLesson()) return;
-    const next = micro + delta;
-    if (next < 0) return;
-    if (next >= lessonCount()) {
-      if (step === 4) return;
-      selectStage(step + 1);
-      buttons[step].focus();
-      return;
+    const options = track();
+    const target = options[stepIndex() + delta];
+    if (target) {
+      showLesson(step, target[0]);
+    } else if (matrixLesson()) {
+      if (delta > 0) return leaveMatrix();
+    } else {
+      const nextStage = step + delta;
+      const nextOptions = course[nextStage];
+      if (!nextOptions) return;
+      showLesson(nextStage, nextOptions[delta > 0 ? 0 : nextOptions.length - 1][0]);
     }
-    const wasProjectLesson = projectLesson();
-    micro = next;
-    guide();
-    rebuild();
-    if (writing()) moveCamera(true);
-    else if (step === 4 || (step === 3 && delta < 0 && micro === 2) || wasProjectLesson !== projectLesson()) moveCamera(false);
-    if (wasProjectLesson !== projectLesson()) resize();
-    if (micro === 0) id('micro-next').focus();
+    const focused = delta > 0 ? id('micro-next') : id('micro-prev');
+    if (focused.disabled) stepSelect.focus({preventScroll: true});
   }
-  buttons.forEach((b, i) => b.addEventListener('click', () => selectStage(i)));
+  buttons.forEach((button, index) => button.addEventListener('click', () => {
+    if (index === step && !matrixLesson()) return;
+    showLesson(index, 0);
+    scrollBelowTrace();
+  }));
+  stepSelect.addEventListener('change', () => showLesson(step, Number(stepSelect.value)));
+  traceButtons.forEach((button, index) => button.addEventListener('click', () => {
+    const [stage, substep, , reviewStep = substep] = traceMarks[index];
+    showLesson(stage, reviewStep);
+    scrollBelowTrace();
+  }));
   id('micro-prev').addEventListener('click', () => changeMicro(-1));
-  id('micro-next').addEventListener('click', () => changeMicro(1));
-  id('probe').addEventListener('input', e => {
-    column = Number(e.target.value);
+  id('micro-next').addEventListener('click', () => {
+    if (step === 0) scrollBelowTrace();
+    changeMicro(1);
+  });
+  id('reading-prev').addEventListener('click', () => {
+    changeMicro(-1);
+    scrollBelowTrace(id('lesson-guide'));
+  });
+  id('reading-next').addEventListener('click', () => {
+    changeMicro(1);
+    scrollBelowTrace(id('lesson-guide'));
+  });
+  id('matrix-return').addEventListener('click', leaveMatrix);
+  id('probe').addEventListener('input', event => {
+    column = event.target.valueAsNumber;
     guide();
     rebuild();
   });
+  function updatePointPosition() {
+    A.x = pointX.valueAsNumber;
+    block.copy(defaultBlock).translate(v(A.x - defaultA.x, 0, 0));
+    q.copy(A).sub(O);
+    lightA.copy(A).applyMatrix4(V);
+    ndcA.copy(lightA).applyMatrix4(P);
+    texA.copy(ndcA).multiplyScalar(.5).addScalar(.5);
+    samples = sampleDepthMap();
+    guide();
+    rebuild();
+  }
+  pointX.addEventListener('input', updatePointPosition);
+  id('point-reset').addEventListener('click', () => {
+    pointX.value = fmt(defaultA.x);
+    updatePointPosition();
+  });
+  function enterMatrix() {
+    matrixReturn = [step, micro];
+    matrixColumn = 3;
+    showLesson(1, matrixTrack[0][0]);
+    scrollBelowTrace();
+    id('micro-next').focus({preventScroll:true});
+  }
+  id('matrix-jump').addEventListener('click', enterMatrix);
+  id('matrix-jump-top').addEventListener('click', enterMatrix);
+  originHandles.forEach(handle => {
+    handle.addEventListener('pointerdown', beginOriginDrag);
+    handle.addEventListener('pointermove', dragOrigin);
+    handle.addEventListener('lostpointercapture', endOriginDrag);
+  });
+  originSliders.forEach(slider => slider.addEventListener('input', setWorldOrigin));
+  id('origin-reset').addEventListener('click', () => {
+    originSliders.forEach(slider => { slider.value = 0; });
+    setWorldOrigin();
+  });
+  matrixColumnButtons.forEach(button => button.addEventListener('click', () => {
+    matrixColumn = Number(button.dataset.matrixCol);
+    guide();
+    rebuild();
+  }));
+  matrixRowButtons.forEach(button => button.addEventListener('click', () => {
+    matrixRow = Number(button.dataset.matrixRow);
+    guide();
+    rebuild();
+  }));
+  matrixSliders.forEach(slider => slider.addEventListener('input', () => {
+    guide();
+    rebuild();
+  }));
+  matrixSourceButtons.forEach(button => button.addEventListener('click', () => {
+    matrixSource = button.dataset.matrixSource;
+    guide();
+    rebuild();
+  }));
+  matrixFloorColumn.addEventListener('input', () => {
+    guide();
+    rebuild();
+  });
+  id('matrix-derivation').addEventListener('toggle', () => {
+    if (micro === matrixSteps.shadow) rebuild();
+  });
   id('oblique').addEventListener('click', () => moveCamera(false));
   id('along').addEventListener('click', () => moveCamera(true));
+  id('setup-origin').textContent = 'O = ' + tuple(O);
+  id('setup-axis').textContent = tuple(lightDirection);
+  id('setup-up').textContent = 'U = ' + tuple(U);
+  pointX.value = fmt(defaultA.x);
   guide();
   if (renderer) {
     rebuild();
