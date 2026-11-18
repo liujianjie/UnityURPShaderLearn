@@ -18,6 +18,13 @@
 
 在[第 9 章前向渲染示例](../Assets/Shaders/Chapter9/Chapter9-ForwardRendering.shader)中，`normalize(_WorldSpaceCameraPos - i.worldPos)` 得到从表面点指向相机位置的单位向量。这是透视视线方向的常用写法；如果 Shader 同时支持正交相机，用 URP 的 `GetWorldSpaceNormalizeViewDir` 取得与投影类型一致的方向。
 
+<a id="unpack-normal"></a>
+## `UnpackNormal` 怎样把贴图通道还原成法线？
+
+使用 0 到 1 的通道存放有符号的方向分量时，存入的值是 `分量 / 2 + 0.5`，读出时用 `2 × 通道值 − 1` 还原。比如 `0.5` 对应分量 `0`，`0.7` 对应分量 `0.4`。
+
+URP 14.0.12 的 `ShaderLibrary/Packing.hlsl` 有多种分支。RG/AG 分支先用 `2 × (R × A, G) − 1` 还原 `x、y`。RG 布局令 `A = 1`，AG 布局令 `R = 1`。两种布局都只存切线空间的前两个分量，再按 `z = sqrt(1 − saturate(x² + y²))` 恢复朝外的分量，源码还对 `z` 设了极小的下限。RGB 分支对三个通道各做一次 `2c−1`。[Unity 2022.3 的 Packing.hlsl](https://github.com/Unity-Technologies/Graphics/blob/2022.3/staging/Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl) · [第 10 章的取样和解码算例](Chapter10-GlassRefraction-3D.html#decode)
+
 <a id="saturate"></a>
 ## `saturate` 为什么常出现在灯光点积后？
 

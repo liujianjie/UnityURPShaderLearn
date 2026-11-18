@@ -78,6 +78,29 @@ half3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
 3. **让倒影随局部法线偏转。** 顶点调用 `GetVertexNormalInputs` 获取世界空间的 `T、B、N`。URP 14.0.12 以 `cross(N, T) * tangentOS.w * GetOddNegativeScale()` 得到 `B`，乘号后的因素用于保留切线基底的朝向，处理镜像 UV 和奇数个负缩放。Shader 把[切线转世界矩阵](Graphics-Fundamentals.md#tangent-frame)的三行放在 `TtoW0/1/2.xyz`，用每行与原切线空间法线的点积得到世界法线的一个分量，最后归一化。三个 `.w` 只是顺手装入的世界位置 `x/y/z`，用于求从片元指向相机的方向 `V`；它们不参与法线变换。用 `reflect(-V, N_ws)` 得到朝向环境的方向，采样 `_Cubemap`，再乘 `_MainTex.rgb` 给倒影上色。
 4. **把两份 RGB 合成。** `_RefractAmount = 0` 只显示倒影，`1` 只显示背景取样，中间值线性混合。本例没有按视角算菲涅尔权重。片元返回 `alpha = 1`，透过玻璃的观感来自手动读入背景颜色。透明队列用于安排绘制时间，不会自动抓取背景。
 
+### 同一个 `bump` 怎样选墙色和倒影？倾角会移动 A 吗？
+
+玻璃上的像素 `P` 正对砖红墙，旁边是蓝墙。图中画在 `P` 上的粉箭头 `bump` 垂直于法线贴图所描述的小面。三个数分别表示沿玻璃表面 `T` 轴、`B` 轴和垂直玻璃的 `N` 轴的分量。背景取色直接把前两个数当作屏幕偏移系数。倒影取色则用三个数拼出世界空间的法线，再和相机方向一起算出应该去 Cubemap 的哪面窗取色。[在图中认出 bump](Chapter10-GlassRefraction-3D.html#basis)
+
+第 82 行从内往外执行。`tex2D(_BumpMap, i.uv.zw)` 在片元 `P` 的 UV 处取样，颜色通道中存的是方向数据。`UnpackNormal` 把这四个通道数还原为箭头的三个分量。本章材质给 `_BumpMap` 绑定了 `Glass_Normal.jpg`，顶点把法线贴图的 UV 放在 `o.uv.zw`，供片元读取。交互页用示意样本 `(0.7, 0.65, 0, 1)` 复算出 `(0.4, 0.3, 0.866…)`。[看 UV 取样](Chapter10-GlassRefraction-3D.html#sample) · [逐项解码](Chapter10-GlassRefraction-3D.html#decode) · [URP 解码规则](Unity-Shader-Practice.md#unpack-normal)
+
+**A 由 P 的屏幕位置决定，倾角决定从 A 向哪里、走多远去读 B。** 演示让 P 投到 `(152, 96)` 个渲染像素处。在 `320 × 200` 的画面里，A 的 UV 就是 `(152/320, 96/200) = (0.475, 0.48)`。固定 P 和相机，可以直接对照两个倾角。
+
+- **平整 0°。** 箭头垂直玻璃，`bump = (0, 0, 1)`。横、纵偏移都是零，B 与 A 重合，P 的背景色来自砖红墙。
+- **正倾 30°。** 示例让单位箭头朝横 4、纵 3 的方向倾斜。它在表面上的投影长 `sin(30°) = 0.5`，所以 `bump.xy = (0.5 × 4/5, 0.5 × 3/5) = (0.4, 0.3)`。乘强度 `40` 就是向右 `16`、向上 `12` 个渲染像素。B 到了 `(168, 108)`，越过 `x = 160` 的墙缝，P 读到蓝色。把强度拖到零，B 就回到 A。[在背景图上试算](Chapter10-GlassRefraction-3D.html#refraction)
+
+再固定一个贴图样本 `bump = (0.6, 0, 0.8)`，只把玻璃绕世界 Y 轴转 90°。局部的 `T = +X` 转成 `−Z`，`N = +Z` 转成 `+X`。用 `0.6*T + 0.8*N` 拼出的世界法线从 `(0.6, 0, 0.8)` 变成 `(0.8, 0, −0.6)`，倒影随之改向。背景分支在换轴之前取 `bump.xy`。取强度 `20` 时，相对 A 的偏移仍是横向 `12` 个像素。如果旋转同时使 P 投到屏幕上的另一处，A 会随这个新投影移动。
+
+### `TtoW0/1/2` 怎样同时传法线变换和世界位置？
+
+沿 `T` 走一格，把这段位移改用世界 `X、Y、Z` 记录，就得到矩阵第一列。沿 `B、N` 各走一格得到第二、三列。Shader 第 72～74 行按行存这张表。第一行 `TtoW0.xyz = (T.x, B.x, N.x)` 取三根局部轴各自的世界 X 分量。把它们分别乘以沿 `T、B、N` 要走的距离，再相加，得到世界 X 上的总位移。其余两行同理。[选一根轴看矩阵的列](Chapter10-GlassRefraction-3D.html#matrix) · [逐行点积](Chapter10-GlassRefraction-3D.html#dot)
+
+玻璃绕世界 Y 转 `−90°` 时，第 92 行右侧读入旧的 `bump = (0.4, 0.3, 0.866…)`，沿 `T、B、N` 量。第一行 `(0, 0, −1)` 与它点乘得 `−0.866…`，另两行得到 `0.3` 和 `0.4`。`normalize` 统一单位长度后，等号把这组三轴读数写回 `bump`。沿世界 `X、Y、Z` 用新读数走，和沿 `T、B、N` 用旧读数走，在本平面算例里到达同一个粉色箭头尖。[切换 bump 的两种读法](Chapter10-GlassRefraction-3D.html#normal-result)
+
+每份 `TtoW` 是四格数据。顶点先用 `positionWS` 得到当前蓝点的世界位置，再把 X、Y、Z 依次写进三个 `.w`。例如 `Q0`、`Q1`、`Q2` 的世界 Y 分别是 `0.6`、`0.6`、`1.8`，各写入自身的 `o.TtoW1.w`。图中的白点 `P` 是三角形重心，`i.TtoW1.w` 经等权插值得到 `(0.6 + 0.6 + 1.8) / 3 = 1`。第 78 行依次取三份插值结果的 `.w`，得到 `P = (1, 1, 1)`，也就是从场景原点沿世界 X、Y、Z 各走一格到白点的位置。[图上的 P](Chapter10-GlassRefraction-3D.html#reflection) · [看对应字段怎样插值](Chapter10-GlassRefraction-3D.html#interp-pos)
+
+相机点 `C = (−2, 1, 5)`。从白点 `P` 出发，用 `C − P = (−3, 0, 4)` 找到 P 到 C 的整段位移。三个分量除以长度 `5` 得到 `worldViewDir = (−0.6, 0, 0.8)`，对应从 P 朝 C 的紫色单位箭头，取负后作为 `reflect` 的入射方向。[完整的 P 到 C 位移](Chapter10-GlassRefraction-3D.html#view) · [紫色单位箭头](Chapter10-GlassRefraction-3D.html#view-unit)
+
 ### 迁移到 URP 时，玻璃为什么一度看不到里面的球？
 
 迁移期间，原来的 `GrabPass` 已注释，Shader 还在读默认是白图的 `_RefractionTex`，[玻璃材质](../Assets/Materials/Chapter10/GlassRefractionMat.mat) 也没有给这个槽绑定相机画面。因此折射分支在纯白背景上移动取样坐标，读不出球或墙的轮廓。能看到 Cubemap 倒影，只能说明反射分支有数据。
