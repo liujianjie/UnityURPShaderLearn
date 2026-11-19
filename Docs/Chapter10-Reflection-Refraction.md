@@ -103,7 +103,7 @@ half3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
 
 矩阵的三列各记录一次以 `P` 为起点的试走。玻璃绕世界 Y 转 `−90°` 时，`T` 从 `+X` 转到 `+Z`，`B` 与转轴同向，仍沿 `+Y`，`N` 从 `+Z` 转到 `−X`。从 `P = (1, 1, 1)` 单独沿 `B` 走一格到 `(1, 2, 1)`，终点减 `P` 得到第二列 `(0, 1, 0)`。单独沿 `N` 走一格到 `(0, 1, 1)`，得到第三列 `(−1, 0, 0)`。沿 `T` 走一格的局部输入是 `(1, 0, 0)`，因此本次把第一列乘 `1`，把第二、三列乘 `0`。[点表头试走这三步](Chapter10-GlassRefraction-3D.html#matrix)
 
-Shader 第 72～74 行按行存这张表。第 92 行在片元取 `i.TtoW0.xyz = (T.x, B.x, N.x)` 与旧 `bump` 点积，前三项如何对应见[切线到世界的推导](Graphics-Fundamentals.md#tangent-frame)。图解用旋转 `−45°`、法线倾角 `+30°` 演示 X 上的折返。蓝段在 X 尺上走 `+0.28284`，黄段走 `0`，绿段走 `−0.61237`，合计 `−0.32953`。合计是 `Q` 的投影减 `P` 的投影。[先拼出三段](Chapter10-GlassRefraction-3D.html#combine) · [看世界轴上的逐行点积](Chapter10-GlassRefraction-3D.html#dot)
+Shader 第 72～74 行按行存这张表。把三列各乘旧 `bump` 的一个分量，得到三段已经用世界坐标表示的位移。只取每段的 X 相加，就是第 92 行的 `dot(i.TtoW0.xyz, bump)`，Y、Z 同理。图解用旋转 `−45°`、法线倾角 `+30°` 演示 X 上的折返。蓝段在 X 尺上走 `+0.28284`，黄段走 `0`，绿段走 `−0.61237`，合计 `−0.32953`。[看世界轴上的逐行点积](Chapter10-GlassRefraction-3D.html#dot) · [从点的换算推导位移的换算](Graphics-Fundamentals.md#tangent-frame)
 
 玻璃绕世界 Y 转 `−90°` 时，第 92 行右侧读入旧的 `bump = (0.4, 0.3, 0.866…)`，沿 `T、B、N` 量。第一行 `(0, 0, −1)` 与它点乘得 `−0.866…`，另两行得到 `0.3` 和 `0.4`。`normalize` 统一单位长度后，等号把这组三轴读数写回 `bump`。沿世界 `X、Y、Z` 用新读数走，和沿 `T、B、N` 用旧读数走，在本平面算例里到达同一个粉色箭头尖。[切换 bump 的两种读法](Chapter10-GlassRefraction-3D.html#normal-result)
 

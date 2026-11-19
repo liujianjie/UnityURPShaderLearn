@@ -116,6 +116,7 @@
     .matrix td:nth-child(4), .matrix thead th:nth-child(4) { color: var(--normal); }
     .matrix [data-position] { color: var(--sample); }
     .matrix [data-result] { color: var(--sample); }
+    #normal-input { background: var(--well); }
     #frame-transform[data-direction="to-local"] :is(td, th):not(:last-child) { color: inherit; }
     #frame-transform :is(th, td):last-child { color: var(--sample); }
     .projection { padding: 10px 17px 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--well); }
@@ -308,11 +309,17 @@
               <th scope="col"><span data-column-name>N 列</span><button type="button" class="soft-button" data-column="2" hidden>N 列</button></th>
               <th scope="col" data-position>.w 位置</th><th scope="col" data-result>点积</th>
             </tr>
+            <tr id="normal-input" hidden>
+              <th scope="row">旧 bump <span>沿 T / B / N</span></th>
+              <td></td><td></td><td></td><td>逐行相加</td>
+            </tr>
           </thead>
           <tbody id="matrix-values"></tbody>
         </table>
       </div>
-      <section id="projection" class="projection" aria-labelledby="projection-title" hidden>
+      <ol class="walk" id="walk" aria-label="用当前设置一步步算"></ol>
+      <details id="projection" class="details projection" hidden>
+        <summary>展开世界轴刻度尺</summary>
         <div class="line-title">
           <h3 id="projection-title"></h3>
           <button id="projection-example" type="button" class="soft-button">看 −45° 的折返算例</button>
@@ -322,8 +329,7 @@
           <span></span><div class="projection-ruler"><span>−1</span><span>0（P）</span><span>+1 →</span></div><span></span>
         </div>
         <div id="projection-legs"></div>
-      </section>
-      <ol class="walk" id="walk" aria-label="用当前设置一步步算"></ol>
+      </details>
       <div id="mix-strip" class="mix-strip" hidden>
         <div class="mix-item"><i id="reflect-swatch"></i>倒影 <span id="reflect-weight"></span></div>
         <div class="mix-item"><i id="refract-swatch"></i>背景 <span id="refract-weight"></span></div>
@@ -332,8 +338,8 @@
       <details class="details" id="more">
         <summary id="more-title"></summary>
         <dl id="values" class="value-list"></dl>
-        <div class="mini-actions" id="position-detail" hidden>
-          <button type="button" class="soft-button">看顶点位置怎样传给 P →</button>
+        <div class="mini-actions" id="detail-entry" hidden>
+          <button type="button" class="soft-button"></button>
         </div>
       </details>
     </section>
@@ -457,13 +463,14 @@
       choices:{key:'localAxis', label:'沿哪根局部轴读数', options:['T 行','B 行','N 行']}
     },
     'tangent-to-world': {
-      name:'求逆回世界', title:'反过来从切线到世界，为什么三根轴改放在列上？',
-      purpose:'这一步对应 Shadow 的灯光 → 世界。仍看同一个白点 P，沿用刚才的 T、B、N 和 P。把世界 → 切线的公式倒过来解。',
+      name:'求逆回世界', title:'用 E 和 P，把切线坐标换回世界坐标',
+      purpose:'沿用上一页的 E = [T B N]，三列分别是蓝 T、黄 B、绿 N 的世界方向。pTS 和 pWS 是同一个点的切线坐标和世界坐标。现在反过来，由 pTS 求 pWS。',
       caption:'局部 (0, 0, 0) 对应白点 P 的世界位置',
       flatHint:'彩色 T、B、N 从白点 P 出发。青色 OP 从世界原点走到 P，对应反向矩阵第四列的前三个数。',
       spaceHint:'白点 P 上的 T、B、N 是前三列。青色 OP 对应第四列，把局部零点放回世界里的 P。',
       try:'点「对照 −45°」，看前三列随玻璃一起转。玻璃绕 P 转，第四列 P 保持原值。',
-      more:'求逆时哪一部分转置？', legend:originLegend, controls:['turn']
+      more:'展开求逆的理由和矩阵细节', detailButton:'看单位试走与 Shader 打包 →',
+      legend:originLegend, controls:['turn']
     },
     matrix: {
       name:'三根轴放三列', title:'T、B、N 三列各记录哪一步？',
@@ -495,17 +502,17 @@
       more:'同一个字段的第四格装什么？', source:72, legend:frameLegend, controls:['turn'], space:true, choices:axisChoices
     },
     dot: {
-      name:'三个 dot 怎么算', title:'为什么这里的 dot 就等于沿世界轴走了多少？',
-      purpose:'Shadow 的每一行选一根灯光轴来读数。这里每一行选一根世界轴，量粉箭头 PQ 在那根轴上走了多远。粉箭头和蓝、黄、绿三段折线共用起点 P 和终点 Q。',
+      name:'用 E 换算 bump', title:'第 92 行把 E × 旧 bump 算成三个 dot',
+      purpose:'沿用上一页的 E。旧 bump 给出从 P 到粉色箭头尖 Q 的 T、B、N 格数。换成世界坐标时，用这三个数去乘 E 的三列。',
       caption:'数出三段各自在同一根世界轴上的位移',
-      flatHint:'彩色虚线把每段终点投到穿过 P 的世界轴上。看标有 T 段、B 段、N 段的刻度尺，每段位移等于这一段末尾的刻度减开头的刻度。',
-      spaceHint:'沿彩色虚线在世界轴上找各段终点的投影。刻度尺逐段显示这些读数。青箭头从零点 P 指到最后的投影。',
-      try:'点「看 −45° 的折返算例」。在世界 X 尺上，蓝段向右，黄段停在原刻度，绿段向左。再点 Y 或 Z 看同一条折线在另一根轴上的读数。',
-      more:'为什么点积这里取 .xyz？', source:92, legend:[...matrixLegend,['sample','选中的世界分量']], controls:['tilt','turn'], space:true, choices:axisChoices
+      flatHint:'蓝、黄、绿是乘了旧 bump 的三列，首尾相接到 Q。青箭头是这条折线在所选世界轴上的总位移。',
+      spaceHint:'蓝、黄、绿三段首尾相接到 Q。青箭头对应右侧高亮行的 dot 结果。',
+      try:'用 −90° 和 +30° 对照 X、Y、Z。右侧高亮行与图上的青箭头一起切换。',
+      more:'展开 .xyz 和 .w 的对应', source:92, legend:[...matrixLegend,['sample','选中的世界分量']], controls:['tilt','turn'], space:true, choices:axisChoices
     },
     'normal-result': {
       name:'bump 前后对照', title:'第 92 行前后，bump 的三个数分别怎么量？',
-      purpose:'两种读法都画玻璃上 P 的同一支粉箭头。执行第 92 行前沿玻璃的 T、B、N 量，执行后沿场景的 X、Y、Z 量，并把长度调到 1。',
+      purpose:'用旧 bump 沿 T、B、N 走，再用新 bump 沿世界 X、Y、Z 走，对照两种读法画出的箭头。',
       caption:'两套轴、同一支粉箭头',
       flatHint:'切换量法，找两条路线共同的起点 P 和粉色终点。',
       spaceHint:'切换量法，对照两条分段路线怎样从 P 到达同一个粉色箭头尖。',
@@ -528,7 +535,7 @@
       caption:'白点 P 在玻璃面上',
       flatHint:'从灰点 O 沿青色的 X、Y、Z 三段走到白点 P。',
       spaceHint:'从灰点 O 沿青色的 X、Y、Z 三段走到白点 P。',
-      more:'展开三个 .w 的来源', source:78,
+      more:'展开三个 .w 的来源', detailButton:'看顶点位置怎样传给 P →', source:78,
       legend:[['ink','P · 正在着色的玻璃点'],['sample','从世界原点 O 走到 P']], controls:[], space:true
     },
     'vertex-pos': {
@@ -599,22 +606,30 @@
   };
   const { measure, normalLegs, number, tuple, cssColor, pixel, originUV, bumpUV, faces, coordinateSteps } = GlassLab;
   const sections = {
-    basis:['basis','sample','decode','decode-foot','decode-z','frame','world-to-tangent','tangent-to-world','matrix','combine','rows','dot','normal-result'],
+    basis:['basis','sample','decode','decode-foot','decode-z','frame','world-to-tangent','tangent-to-world','dot','normal-result'],
     refraction:['refraction'],
     reflection:['reflection','view','bounce'],
     mix:['mix']
   };
   const stepOrder = Object.values(sections).flat();
-  const positionDetailSteps = ['vertex-pos','pack-pos','interp-pos','read-pos'];
-  const positionRoute = ['reflection', ...positionDetailSteps, 'view'];
+  const detailSteps = {
+    'tangent-to-world':['matrix','combine','rows'],
+    reflection:['vertex-pos','pack-pos','interp-pos','read-pos']
+  };
   const paletteProperties = {t:'tangent',b:'bitangent',n:'normal',ink:'text'};
   const focus = {axis:0, localAxis:0, column:0, legs:0, reading:0};
   let step = 'basis', data, viewChoice, wantsSpace = false, spaceStatus = 'idle';
   let drawSpace;
   let resetView = () => {};
 
+  function detailOwner(key) {
+    return Object.keys(detailSteps).find(entry => detailSteps[entry].includes(key));
+  }
+
   function activeStepOrder() {
-    return positionDetailSteps.includes(step) ? positionRoute : stepOrder;
+    const owner = detailOwner(step);
+    if (!owner) return stepOrder;
+    return [owner, ...detailSteps[owner], stepOrder[stepOrder.indexOf(owner) + 1]];
   }
 
   function chooseFocus(key, value) {
@@ -629,9 +644,9 @@
     step = next;
     if (step === 'interp-pos') focus.axis = 1;
     const page = steps[step];
-    const positionDetail = positionDetailSteps.includes(step);
-    const section = positionDetail ? 'reflection' : Object.keys(sections).find(key => sections[key].includes(step));
-    const substeps = positionDetail ? ['reflection', ...positionDetailSteps] : sections[section];
+    const owner = detailOwner(step);
+    const section = Object.keys(sections).find(key => sections[key].includes(owner ?? step));
+    const substeps = owner ? [owner, ...detailSteps[owner]] : sections[section];
     document.querySelectorAll('[data-step]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.step === section)));
     byId('subflow').hidden = substeps.length < 2;
     byId('subflow').replaceChildren(...substeps.map(key => {
@@ -639,7 +654,7 @@
       button.type = 'button';
       button.className = 'soft-button';
       button.dataset.substep = key;
-      button.textContent = positionDetail && key === 'reflection' ? '返回找到 P' : steps[key].name;
+      button.textContent = key === owner ? `返回${steps[key].name}` : steps[key].name;
       button.setAttribute('aria-pressed', String(key === step));
       return button;
     }));
@@ -669,7 +684,10 @@
     byId('lesson-title').textContent = page.title;
     byId('more-title').textContent = page.more;
     byId('more').open = false;
-    byId('position-detail').hidden = step !== 'reflection';
+    byId('projection').open = false;
+    const detailEntry = byId('detail-entry');
+    detailEntry.hidden = !page.detailButton;
+    detailEntry.querySelector('button').textContent = page.detailButton ?? '';
     byId('legend').replaceChildren(...(page.legend ?? []).map(([palette,label]) => {
       const row = document.createElement('li'), dot = document.createElement('i');
       dot.style.setProperty('--ink',`var(--${paletteProperties[palette] ?? palette})`);
@@ -747,7 +765,7 @@
       matrix:'每列记录一次独立的试走。点表头选择要在图中量的那一步。',
       combine:'亮起的列代表图中已经走过的段，每列乘以自己的贴图读数。',
       rows:'高亮的一行从三根局部轴读取同一个世界分量',
-      dot:'一行的三个数依次是 T、B、N 各走 1 格时在该世界轴上走了多少。',
+      dot:'沿用上一页左上角的 E。表头给出旧 bump 的三个系数，每行算一个世界分量。',
       'pack-pos':'当前顶点 Q0 的 o。青色 .w 一列存 Q0 的坐标',
       'read-pos':'当前片元 P 的 i。三行的 .w 依次给出 P 的世界 x、y、z'
     };
@@ -758,6 +776,11 @@
     byId('matrix-caption').textContent = captions[step];
     byId('matrix').querySelectorAll('[data-position]').forEach(cell => { cell.hidden = !carriesPosition; });
     byId('matrix').querySelectorAll('[data-result]').forEach(cell => { cell.hidden = step !== 'dot'; });
+    const normalInput = byId('normal-input');
+    normalInput.hidden = step !== 'dot';
+    if (step === 'dot') {
+      data.ts.forEach((value, column) => { normalInput.cells[column + 1].textContent = number(value, 5); });
+    }
     const columnActive = column => (step === 'matrix' && column === focus.column) ||
       (step === 'combine' && column <= focus.legs);
     const headings = byId('matrix').querySelector('thead tr').cells;
@@ -799,7 +822,7 @@
     panel.dataset.direction = toLocal ? 'to-local' : 'to-world';
     byId('frame-transform-caption').textContent = toLocal
       ? '世界 → 切线　·　每一行读取一根局部轴，第四列把零点移到 P'
-      : '切线 → 世界　·　每一列给出一根局部轴的世界方向，第四列给出 P';
+      : '切线 → 世界的 4×4 矩阵。左上 3×3 是 E，第四列的上三格是 P。';
     const headers = panel.querySelector('thead tr').cells;
     Array.from(inputAxes).forEach((axis, index) => { headers[index + 1].textContent = axis; });
     panel.querySelector('tbody').replaceChildren(...[...rows, [0, 0, 0, 1]].map((values, index) => {
@@ -1090,23 +1113,25 @@
         ['青色 OP · 从世界原点起量', tuple([...worldPos, 1], 4), 'sample']
       ]);
       lesson([
-        ['两边乘 E，消掉 Eᵀ', [
-          '已知　pTS = Eᵀ(pWS − P)',
-          '两边左乘 E　E pTS = E Eᵀ(pWS − P) = pWS − P',
-          '两边加 P　pWS = E pTS + P'
-        ], '本例的 T、B、N 各长 1，彼此垂直。EᵀE 中同一根轴的点积为 1，不同轴的点积为 0，所以 EᵀE 是单位矩阵。E 是 3×3 方阵，Eᵀ 与 E 互为逆，反过来相乘也是单位矩阵。'],
-        ['前三列跟着 T、B、N，第四列加 P', [
-          `E = [T B N]　T ≈ ${vecText(tangent)}，B ≈ ${vecText(bitangent)}，N ≈ ${vecText(normal)}`,
-          '反向的 4×4 矩阵，上三行是 [E | P]，末行是 (0, 0, 0, 1)',
-          '灯光 → 世界的同一写法是上三行 [R U K | O]'
-        ], '沿 T 走的格数乘 T 列，沿 B、N 走的格数各乘对应的列。三段世界位移相加后还要加 P，才得到点的世界位置。图上彩色三轴从 P 出发，青色 OP 给出这个起点的世界坐标。'],
-        ['用切线原点验算反向矩阵', [
-          `输入 (0, 0, 0, 1)　→　0 × T + 0 × B + 0 × N + 1 × P`,
-          `输出 ${tuple([...worldPos, 1], 4)}　→　图上的白点 P`
-        ], '前三列的输入都为 0，只剩第 4 列。上一步把白点的世界位置换成了局部零点，这一步把局部零点换回同一个白点。']
+        ['由 pTS 求 pWS', [
+          '上一页　pTS = Eᵀ(pWS − P)',
+          '两边左乘 E　E × pTS = (E Eᵀ) × (pWS − P)',
+          '右边用 E Eᵀ = I 化简　E × pTS = pWS − P',
+          '两边加 P　pWS = E × pTS + P'
+        ], '本例的三根轴垂直且各长 1，所以 E Eᵀ 得到单位矩阵 I，乘 I 保留输入。左边的 E × pTS 是从 P 出发的世界位移，加 P 得到点的世界位置。'],
+        ['E 填在矩阵里，pTS 放在乘号右边', [
+          'E × pTS = T × pTS.x + B × pTS.y + N × pTS.z',
+          '[E | P] × (pTS.x, pTS.y, pTS.z, 1)ᵀ = E × pTS + P'
+        ], '上式写的是输出的前三格 X、Y、Z。表里的前三列乘 pTS 的三个数，第四列乘输入末尾的 1。pTS 仍在乘号右边，每换一个点，就代入这个点的切线坐标。'],
+        ['用白点 P 验算', [
+          '输入局部原点 (0, 0, 0, 1)',
+          `E × (0, 0, 0) + P = P　→　输出 ${tuple([...worldPos, 1], 4)}`
+        ], '前三列各乘 0，第四列乘 1，结果是图上白点的世界坐标。用同一张表换算箭头时，要看箭头尖 Q 与白点 P 相差多少。']
       ], [
-        ['左上 3×3 与第四列', 'Eᵀ → E，−EᵀP → P',
-          '推导中用到转置的是正交单位基底的 3×3 部分。第四列由 pWS = E pTS + P 得到。']
+        ['为什么 E Eᵀ 是单位矩阵', 'EᵀE = I　→　Eᵀ 是 E 的逆　→　E Eᵀ = I',
+          'EᵀE 的每一格是两根列向量的点积。同轴时为 1，异轴时为 0，得到单位矩阵 I。E 是方阵，所以 Eᵀ 与 E 两种顺序相乘都得到 I。'],
+        ['与 Shadow 的灯光 → 世界对应', '[R U K | O] ↔ [T B N | P]',
+          '两张表都把局部轴的世界方向放前三列，把局部原点的位置放第四列，末行 (0, 0, 0, 1) 把输入末尾的 1 传回。']
       ]);
     } else if (step === 'matrix') {
       const column = focus.column;
@@ -1205,40 +1230,38 @@
         ], `青箭头在世界坐标里只沿 ${worldAxis} 走一格。拿世界 → 切线的三行去读这支箭头，每行的点积就只留下本轴的 ${worldAxis} 分量。读出的三个局部分量恰好就是这条 TtoW 行里的三个数。`]
       ], [
         ['第四格 .w', 'o.TtoW0.w = 顶点的世界 x',
-          '到了「位置与视线 → 写进 .w」，可以看到这三条相同的赋值语句怎样把位置装进去。']
+          '在「03 玻璃倒影 → 找到 P」里展开三个 .w 的来源，可以看到这三条赋值语句怎样把位置装进去。']
       ]);
     } else if (step === 'dot') {
       const row = rows[axis];
       const legs = normalLegs(data);
-      const contributions = legs.map(({delta}) => delta[axis]);
+      const symbolic = ['T','B','N'].map((name, index) => `${name}.${field} × bump.${'xyz'[index]}`).join(' + ');
       const terms = row.map((component, index) => `(${number(component, 5)} × ${number(ts[index], 5)})`);
       const excerpt = `dot(i.TtoW${axis}.xyz, bump)`;
-      const ends = ['P1','P2','Q'];
-      const origin = worldPos[axis];
-      const tick = value => number(value - origin, 5);
       showProjection(axis, legs, excerpt);
       pictureValues([
-        ['贴图读数 · T、B、N', vecText(ts), 'mapped'],
-        [`读数轴 e_${worldAxis} · 换成 T、B、N`, tuple(row, 4), 'sample'],
+        ['粉箭头尖 Q · 世界位置', vecText(legs.at(-1).to), 'mapped'],
         [`青箭头 · 世界 ${worldAxis} 合计`, number(rawWS[axis], 5), 'sample']
       ]);
       lesson([
-        [`这一行的 dot 读世界 ${worldAxis}`, [
-          `i.TtoW${axis}.xyz = (T.${field}, B.${field}, N.${field}) ≈ ${tuple(row, 5)}`,
-          `右侧的旧 bump ≈ ${tuple(ts, 5)}`
-        ], `上一页把世界 +${worldAxis} 单位箭头平移到 P，再沿 T、B、N 量它，得到的正是这一行。用相同的 T、B、N 坐标对旧 bump 和这根单位箭头做点积，就能读出粉箭头沿世界 +${worldAxis} 走多远。图上是从 P 的零刻度到 Q 的落点那段青箭头。`, [92], {line:92, text:excerpt}],
-        [`先在世界 ${worldAxis} 尺上给每段找起点和终点`, legs.map(({from, to}, index) =>
-          `${'TBN'[index]} 段　${index === 0 ? 'P' : ends[index - 1]} → ${ends[index]}　刻度 ${tick(from[axis])} → ${tick(to[axis])}`
-        ), '把穿过 P 的世界轴当尺子，令 P 的刻度为 0。蓝段终点是 P1，黄段终点是 P2，绿段终点是 Q。顺着每条彩色虚线找它的投影。尺上每一段从上一段的终点接着走。'],
-        [`加完三段，验算世界 ${worldAxis} 的读数`, [
-          ...terms.map((term, index) =>
-            `${'TBN'[index]} 段　${'TBN'[index]}.${field} × bump.${'xyz'[index]} = ${term} ≈ ${number(contributions[index], 5)}`),
-          `${worldAxis} = ${terms.join(' + ')} ≈ ${number(rawWS[axis], 5)}`,
-          `half3(世界 X, 世界 Y, 世界 Z) ≈ ${tuple(rawWS, 5)}`
-        ], `沿 T 走一格在世界 ${worldAxis} 上会移动 T.${field}，走 bump.x 格就乘 bump.x。B、N 两段同样计算。把刻度尺上的三段加起来，就得到这一行的输出。照此读 X、Y、Z，half3 收齐三个世界分量。`]
+        ['用上一页的公式，把箭头尖 Q 和箭尾 P 换到世界', [
+          `Q 的局部坐标 = 旧 bump ≈ ${tuple(ts, 5)}，P 的局部坐标 = (0, 0, 0)`,
+          'Q 的世界位置 − P 的世界位置 = (E × 旧 bump + P) − P = E × 旧 bump'
+        ], '旧 bump 的三个数是从局部原点 P 出发、沿 T、B、N 各走的格数，所以也就是箭头尖 Q 的局部坐标。两点的世界位置相减时，第四列加进去的 P 抵消了。'],
+        [`从蓝、黄、绿三段中，只收集世界 ${worldAxis} 的位移`, [
+          'E × 旧 bump = T × bump.x + B × bump.y + N × bump.z',
+          `世界 ${worldAxis} = ${symbolic}`,
+          `${worldAxis} = ${terms.join(' + ')} ≈ ${number(rawWS[axis], 5)}`
+        ], `E 的三列已经用世界 X、Y、Z 写好。每一列乘对应的格数，得到图中一段世界位移。只求世界 ${worldAxis} 时，每段只取自己的 ${worldAxis} 来相加。所以用表里高亮的这一行，青箭头就是这三段在世界 ${worldAxis} 上合起来走的距离。`],
+        ['一行是一次 dot，三行收齐世界 X、Y、Z', [
+          `i.TtoW${axis}.xyz = E 的 ${worldAxis} 行 ≈ ${tuple(row, 5)}`,
+          `half3(三个 dot) ≈ ${tuple(rawWS, 5)}`
+        ], `第 ${72 + axis} 行存入 E 的 ${worldAxis} 行。第 92 行用 dot 把这一行与旧 bump 对应相乘再相加，算的就是上一式的世界 ${worldAxis}。将 X、Y、Z 三行各算一次，再用 normalize 把结果调成单位长度。`, [72 + axis, 92], {line:92, text:excerpt}]
       ], [
-        ['点积读前三格', `i.TtoW${axis}.xyz ≈ ${vecText(row)}`,
-          '旧 bump 表示位移 PQ。给方向补 0 时，第四列 P 乘 0。第 92 行直接用 .xyz 取三格，第 78 行另取三行的 .w 拼回 P 的世界位置。']
+        ['方向输入末尾补 0', '[E | P] × (bump.x, bump.y, bump.z, 0)ᵀ = E × 旧 bump',
+          '用齐次坐标写位移时，第四格为 0，省去整列 P。Shader 直接取三行的 .xyz 做这三次乘加。'],
+        ['位置由 .w 单独读取', 'worldPos = (i.TtoW0.w, i.TtoW1.w, i.TtoW2.w)',
+          '第 78 行读取第四列的前三格，得到白点 P 的世界位置。']
       ]);
     } else if (step === 'normal-result') {
       const localReading = focus.reading === 0;
@@ -1249,19 +1272,14 @@
         ['同一个粉色箭头尖', vecText(tip), 'mapped']
       ]);
       lesson([
-        ['第 82 行先存贴图给出的局部读数', `执行前 bump ≈ ${vecText(ts)}　沿 T、B、N`,
-          '点「执行前」看彩色路线。从白点 P 依次沿 T、B、N 走三个数指定的距离，终点落在粉箭头尖。第 86 行读取的 bump.xy 也来自这时的值。', [82,86], {line:82, text:'UnpackNormal(tex2D(_BumpMap, i.uv.zw))'}],
-        ['第 92 行把三次 dot 合在一起', [
-          `half3(第一个 dot, 第二个 dot, 第三个 dot) ≈ ${vecText(rawWS)}`,
-          `长度 ≈ ${number(Math.hypot(...rawWS), 3)}　→　normalize 后 ≈ ${vecText(ws)}`
-        ], '先算等号右侧。每个 dot 里的 bump 都取第 82 行读到的旧值。三个 dot 分别给出沿世界 X、Y、Z 的位移，half3 按这个顺序收齐。normalize 把三个分量一起除以长度。当前平面算例的长度已是 1，方向和箭头尖都对得上。', [92], {line:92, text:localReading ? 'dot(i.TtoW0.xyz, bump)' : 'normalize'}],
-        ['等号把结果写回 bump', [
+        ['换成世界读数后，再沿世界轴画一次', [
+          `执行前 bump ≈ ${vecText(ts)}　沿 T、B、N`,
           `执行后 bump ≈ ${vecText(ws)}　沿世界 X、Y、Z`,
-          `世界箭头尖 = P ${vecText(worldPos)} + 新 bump ≈ ${vecText(tip)}`
-        ], '点「执行后」看青色路线。用世界轴走到同一个粉色箭头尖。变量仍叫 bump，里面的三个数现在沿世界轴量。第 93 行用这支世界法线和相机方向算倒影。', [93], {line:93, text:'bump'}]
+          `Q 的世界位置 = P ${vecText(worldPos)} + 新 bump ≈ ${vecText(tip)}`
+        ], '两种画法都从 P 出发。执行前沿蓝、黄、绿三根局部轴走，执行后沿世界三轴走。本例的长度已经是 1，两条路线到达同一个粉色箭头尖。第 93 行用换算后的法线算倒影。', [92], {line:92, text:localReading ? 'dot(i.TtoW0.xyz, bump)' : 'normalize'}]
       ], [
-        ['实际插值时的长度', 'normalize(v) = v / length(v)',
-          '曲面上各顶点的轴可能不同，插值后的向量长度可以改变。这里先算世界方向，再把长度调成 1 供 reflect 使用。']
+        ['normalize 统一长度', `换算后的长度 ≈ ${number(Math.hypot(...rawWS), 3)}`,
+          '曲面上各顶点的轴可能不同，插值后的向量长度可以改变。第 92 行把三个世界分量都除以向量长度，得到单位法线。']
       ]);
     } else if (step === 'refraction') {
       const movement = !tilt || !distortion ? 'B 与 A 重合' : `B 在 A 的${tilt > 0 ? '右上' : '左下'}方`;
@@ -1483,7 +1501,7 @@
   function readStep() {
     const requested = location.hash.slice(1);
     if (requested === 'view-unit') return 'view';
-    return stepOrder.includes(requested) || positionDetailSteps.includes(requested) ? requested : 'basis';
+    return stepOrder.includes(requested) || detailOwner(requested) ? requested : 'basis';
   }
   window.addEventListener('hashchange', () => { if (readStep() !== step) setStep(readStep()); });
   document.querySelectorAll('[data-step]').forEach(button => button.addEventListener('click',()=>navigate(button.dataset.step)));
@@ -1525,7 +1543,7 @@
     const order = activeStepOrder();
     goToLesson(order[(order.indexOf(step) + delta + order.length) % order.length]);
   }
-  byId('position-detail').querySelector('button').addEventListener('click', () => goToLesson(positionDetailSteps[0]));
+  byId('detail-entry').querySelector('button').addEventListener('click', () => goToLesson(detailSteps[step][0]));
   byId('previous').addEventListener('click', () => moveStep(-1));
   byId('next').addEventListener('click', () => moveStep(1));
   byId('reset-view').addEventListener('click',()=>resetView());
