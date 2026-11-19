@@ -108,6 +108,7 @@
     .matrix th { font-size: 12px; font-weight: normal; }
     .matrix td, .matrix button { font: 13px/1.6 var(--mono); }
     .matrix th span { display: block; font: 11px/1.5 var(--mono); color: var(--muted); }
+    .matrix th [data-column-name] { font: inherit; color: inherit; }
     .matrix button { padding: 0 5px; white-space: nowrap; }
     .matrix .selected { background: #193235; }
     .matrix td:nth-child(2), .matrix thead th:nth-child(2) { color: var(--tangent); }
@@ -115,6 +116,32 @@
     .matrix td:nth-child(4), .matrix thead th:nth-child(4) { color: var(--normal); }
     .matrix [data-position] { color: var(--sample); }
     .matrix [data-result] { color: var(--sample); }
+    #frame-transform[data-direction="to-local"] :is(td, th):not(:last-child) { color: inherit; }
+    #frame-transform :is(th, td):last-child { color: var(--sample); }
+    .projection { padding: 10px 17px 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--well); }
+    .projection .line-title { flex-wrap: wrap; gap: 6px 10px; margin-bottom: 6px; }
+    .projection .soft-button { color: var(--sample); }
+    .projection-code { margin: 0 0 8px; font: 12px/1.6 var(--mono); overflow-wrap: anywhere; }
+    .projection-code samp { font: inherit; color: var(--sample); }
+    .projection-line { display: grid; grid-template-columns: 3.4em minmax(0,1fr) 5.6em; gap: 8px; align-items: center; min-height: 24px; }
+    .projection-line > samp { color: var(--segment-ink); font: 12px/1.4 var(--mono); }
+    .projection-line > samp:last-child { text-align: right; }
+    .projection-ruler { display: flex; justify-content: space-between; color: var(--muted); font: 11px/1.4 var(--mono); }
+    .projection-reading { display: grid; align-items: start; }
+    .projection-endpoints { text-align: center; color: var(--muted); font: 11px/1.35 var(--mono); }
+    .projection-track {
+      position: relative; height: 20px; margin-inline: 2px;
+      background: linear-gradient(var(--line), var(--line)) center/1px 100% no-repeat,
+        linear-gradient(var(--line), var(--line)) center/100% 1px no-repeat;
+    }
+    .projection-segment { position: absolute; top: 9px; height: 2px; color: var(--segment-ink); background: currentColor; }
+    .projection-segment::after {
+      content: ''; position: absolute; top: -3px; right: 0; width: 6px; height: 6px;
+      border-top: 2px solid currentColor; border-right: 2px solid currentColor; transform: rotate(45deg);
+    }
+    .projection-segment.reverse::after { right: auto; left: 0; transform: rotate(-135deg); }
+    .projection-segment.zero::after { right: -3px; top: -2px; border: 0; border-radius: 50%; background: currentColor; transform: none; }
+    .projection-line:last-child { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 3px; }
     .mini-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
     .mix-strip { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
     .mix-item { flex: 1 1 98px; color: var(--muted); font-size: 12px; }
@@ -173,7 +200,7 @@
       .flow button { min-height: 55px; padding: 9px; gap: 6px; }
       .flow small { display: none; }
       .figure-top { padding-inline: 10px; }
-      .code-section, .mix-strip, .details, .walk, .matrix { padding-inline: 12px; }
+      .code-section, .mix-strip, .details, .walk, .matrix, .projection { padding-inline: 12px; }
       .value-list div { grid-template-columns: minmax(108px, .9fr) minmax(0,1.3fr); gap: 5px; }
       dd, .code-line, .matrix td { font-size: 11px; }
     }
@@ -193,7 +220,7 @@
   <nav class="flow" aria-label="玻璃 Shader 的四步流程">
     <button type="button" data-step="basis" aria-pressed="true"><span class="index">01</span><span><b>法线换轴</b><small>从贴图读数到世界方向</small></span></button>
     <button type="button" data-step="refraction" aria-pressed="false"><span class="index">02</span><span><b>折射取色</b><small>去墙上的哪里借色？</small></span></button>
-    <button type="button" data-step="reflection" aria-pressed="false"><span class="index">03</span><span><b>位置与视线</b><small>worldPos → worldViewDir → 倒影</small></span></button>
+    <button type="button" data-step="reflection" aria-pressed="false"><span class="index">03</span><span><b>玻璃倒影</b><small>找到 P → 算视线 → 取倒影</small></span></button>
     <button type="button" data-step="mix" aria-pressed="false"><span class="index">04</span><span><b>混合颜色</b><small>把两份颜色画回 P</small></span></button>
   </nav>
   <nav class="subflow" id="subflow" aria-label="当前章节的代码步骤" hidden></nav>
@@ -227,7 +254,7 @@
       <ul id="legend" class="legend" aria-label="三维图例" hidden></ul>
       <p id="view-hint" class="view-hint"></p>
       <p class="try"><b>动手试试　</b><span id="try"></span></p>
-      <div class="controls">
+      <div class="controls" id="controls">
         <div class="control" id="tilt-control">
           <label for="tilt">贴图法线倾角 <output id="tilt-value" for="tilt">30°</output></label>
           <input id="tilt" type="range" min="-45" max="45" value="30">
@@ -237,6 +264,7 @@
           <input id="turn" type="range" min="-90" max="90" value="-90">
           <div class="mini-actions">
             <button type="button" class="soft-button" data-turn="-90">算例 −90°</button>
+            <button type="button" class="soft-button" data-turn="-45">对照 −45°</button>
             <button type="button" class="soft-button" data-turn="0">对照 0°</button>
           </div>
         </div>
@@ -261,21 +289,53 @@
     </figure>
 
     <section class="lesson" aria-labelledby="lesson-title">
-      <div class="code-section line-title"><h3>对照第 10 章 Shader</h3><a id="source-link" href="../Assets/Shaders/Chapter10/Chapter10-GlassRefraction.shader">打开源码 ↗</a></div>
+      <div class="code-section line-title"><h3 id="source-title">对照第 10 章 Shader</h3><a id="source-link" href="../Assets/Shaders/Chapter10/Chapter10-GlassRefraction.shader">打开源码 ↗</a></div>
+      <div id="frame-transform" class="matrix" hidden>
+        <table>
+          <caption id="frame-transform-caption"></caption>
+          <thead><tr><th scope="col">输出 ↓ 输入 →</th><th scope="col"></th><th scope="col"></th><th scope="col"></th><th scope="col">w</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
       <div id="matrix" class="matrix" hidden>
         <table>
           <caption id="matrix-caption"></caption>
-          <thead><tr><th scope="col">输出轴 / 字段</th><th scope="col">T 列</th><th scope="col">B 列</th><th scope="col">N 列</th><th scope="col" data-position>.w 位置</th><th scope="col" data-result>点积</th></tr></thead>
+          <thead>
+            <tr>
+              <th scope="col">世界轴 / 字段</th>
+              <th scope="col"><span data-column-name>T 列</span><button type="button" class="soft-button" data-column="0" hidden>T 列</button></th>
+              <th scope="col"><span data-column-name>B 列</span><button type="button" class="soft-button" data-column="1" hidden>B 列</button></th>
+              <th scope="col"><span data-column-name>N 列</span><button type="button" class="soft-button" data-column="2" hidden>N 列</button></th>
+              <th scope="col" data-position>.w 位置</th><th scope="col" data-result>点积</th>
+            </tr>
+          </thead>
           <tbody id="matrix-values"></tbody>
         </table>
       </div>
+      <section id="projection" class="projection" aria-labelledby="projection-title" hidden>
+        <div class="line-title">
+          <h3 id="projection-title"></h3>
+          <button id="projection-example" type="button" class="soft-button">看 −45° 的折返算例</button>
+        </div>
+        <p class="projection-code"><code id="projection-dot"></code> <samp id="projection-result"></samp></p>
+        <div class="projection-line">
+          <span></span><div class="projection-ruler"><span>−1</span><span>0（P）</span><span>+1 →</span></div><span></span>
+        </div>
+        <div id="projection-legs"></div>
+      </section>
       <ol class="walk" id="walk" aria-label="用当前设置一步步算"></ol>
       <div id="mix-strip" class="mix-strip" hidden>
         <div class="mix-item"><i id="reflect-swatch"></i>倒影 <span id="reflect-weight"></span></div>
         <div class="mix-item"><i id="refract-swatch"></i>背景 <span id="refract-weight"></span></div>
         <div class="mix-item"><i id="final-swatch"></i>写回 P</div>
       </div>
-      <details class="details" id="more"><summary id="more-title"></summary><dl id="values" class="value-list"></dl></details>
+      <details class="details" id="more">
+        <summary id="more-title"></summary>
+        <dl id="values" class="value-list"></dl>
+        <div class="mini-actions" id="position-detail" hidden>
+          <button type="button" class="soft-button">看顶点位置怎样传给 P →</button>
+        </div>
+      </details>
     </section>
   </div>
   <div class="step-actions">
@@ -288,6 +348,7 @@
 <script type="module">
   const byId = id => document.getElementById(id);
   const shader = '../Assets/Shaders/Chapter10/Chapter10-GlassRefraction.shader';
+  const packingShader = '../Library/PackageCache/com.unity.render-pipelines.core@14.0.12/ShaderLibrary/Packing.hlsl';
   const inputs = Object.fromEntries(['tilt','turn','distortion','amount','cameraX'].map(name => [name,byId(name)]));
   const sourceLines = {
     37: 'sampler2D _BumpMap;',
@@ -321,11 +382,12 @@
     94: 'half4 texColor = tex2D(_MainTex, i.uv.xy);',
     97: 'half3 reflCol = texCUBE(_Cubemap, reflDir).rgb * texColor.rgb;',
     100: 'half3 finalColor = reflCol * (1-_RefractAmount) + refrCol * _RefractAmount;',
-    102: 'return half4(finalColor, 1.0);'
+    102: 'return half4(finalColor, 1.0);',
+    185: 'normal.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normal.xy, normal.xy))));'
   };
   const frameLegend = [['t','T · 沿纹理 U'],['b','B · 沿纹理 V'],['n','N · 网格法线']];
+  const originLegend = [['ink','P · 切线空间原点'], ['sample','OP · 用世界坐标找到 P'], ...frameLegend];
   const matrixLegend = [...frameLegend,['mapped','nWS · 换轴后的法线']];
-  const viewLegend = [['view','V · P 指向相机'],['ink','−V · 朝玻璃的入射方向']];
   const axisChoices = {key:'axis', label:'看哪根世界轴', options:['世界 X','世界 Y','世界 Z']};
   const positionLegend = [['t','Q0、Q1、Q2 · 网格顶点'],['ink','白点 P · 正在着色的玻璃位置']];
   const steps = {
@@ -348,50 +410,97 @@
       more:'i.uv.zw 为什么用 z 和 w？', source:82, controls:['tilt'], flatOnly:true
     },
     decode: {
-      name:'解码并画箭头', title:'四个取样数怎样变成粉箭头？',
-      purpose:'用上一步的取样值复算。示意样本把沿玻璃的两个分量存进 R、G，A 固定为 1。UnpackNormal 先还原这两个分量，再算出朝外的第三个分量。',
+      name:'解码 x、y', title:'怎样读出蓝段 x 和黄段 y？',
+      purpose:'示意样本把沿玻璃的两个分量存进 R、G，A 固定为 1。先还原两段有方向的位移，找到它们在玻璃上的终点 H。',
       caption:'用三个方向分量从 P 画出 bump',
-      flatHint:'从 P 沿蓝 T、黄 B、绿 N 各走一段，把起点和最后的终点连起来，就得到粉箭头。',
-      spaceHint:'彩色实线是沿 T、B、N 走过的三段。粉箭头从 P 连到最后一段的终点。',
-      try:'依次看 0°、+30°、−30°。对照算式里的正负号，追踪在玻璃平面内走的蓝段和黄段。',
+      flatHint:'从 P 沿蓝段 x 和黄段 y 走到玻璃上的青点 H。绿段从 H 连到粉箭头尖 Q。',
+      spaceHint:'从 P 沿蓝段 x 和黄段 y 走到玻璃上的青点 H。绿段从 H 连到粉箭头尖 Q。',
+      try:'依次看 +30°、−30°。蓝段和黄段会反向，青点 H 也会换到 P 的另一侧。',
       more:'Unity 根据哪种贴图布局解码？',
       source:82, legend:[...frameLegend,['mapped','bump · 贴图法线']], controls:['tilt'], space:true
     },
+    'decode-foot': {
+      name:'在玻璃上量 PH', title:'蓝段和黄段怎样确定 PH 的长度？',
+      purpose:'正对玻璃看。P 是粉箭头的起点，H 是沿蓝段和黄段走完的青点。PH 是两点之间的直线距离。',
+      caption:'直角三角形一 · 沿玻璃看蓝段和黄段',
+      flatHint:'蓝段沿 T，黄段沿 B。拐角的小方块标出 90°，青色 PH 是斜边。',
+      try:'拖到 29° 可以对照截图。点 −30° 再点 +30°，观察 H 换到另一侧时 PH 有多长。',
+      more:'蓝段或黄段是负数怎么办？',
+      source:82, controls:['tilt'], flatOnly:true
+    },
+    'decode-z': {
+      name:'从长度 1 算 z', title:'粉箭头长 1，怎样补出绿段 z？',
+      purpose:'把视线转到玻璃侧面。P 和 H 都在玻璃上，Q 是粉箭头的尖端。绿段从 H 垂直玻璃到 Q，这一段的长度就是要找的 z。',
+      caption:'直角三角形二 · 沿 PH 与 +N 切开看',
+      flatHint:'青色 PH 在玻璃上，绿色 z 垂直玻璃，粉色 PQ 是斜边。灰色虚线画出朝里的另一种解。',
+      try:'试一下平整 0°。这时 H 和 P 重合，粉箭头整支沿 +N，绿段长 1。',
+      more:'源码里的 saturate 和 max 有什么用？',
+      source:185, controls:['tilt'], flatOnly:true
+    },
     frame: {
       name:'T、B、N 从哪来', title:'第 65 行从哪里拿到玻璃的三根轴？',
-      purpose:'贴图里的 x、y、z 分别沿 T、B、N 量。要把这支箭头放到场景里，先用世界 X、Y、Z 写出玻璃上这三根轴的方向。',
-      caption:'从世界坐标看玻璃的三根轴',
-      flatHint:'灰色 O 是世界原点。彩色 T、B、N 画在玻璃上的 P 处。',
-      spaceHint:'蓝 T、黄 B 沿着玻璃，绿 N 垂直玻璃。灰色 X、Y、Z 从世界原点 O 出发。',
-      try:'从 0° 切到 −90°。追踪蓝 T 从世界 +X 转到 +Z，绿 N 从 +Z 转到 −X。',
-      more:'为什么算 B 时还要乘一个符号？', source:65, legend:frameLegend, controls:['turn'], space:true
+      purpose:'θ 是玻璃绕世界 Y 轴转了多少度，数值来自下方的转动滑块。俯视角度图把世界 +Z 画在上方，绿色 N 从 +Z 起量。',
+      caption:'俯视世界 XZ 平面 · 沿绿色 N 量转角',
+      flatHint:'弧线从 +Z 画到绿色 N，标出 θ 的转动。虚线沿世界 X、Z 给出读数，Y 垂直于这张图。',
+      spaceHint:'绿色 N 垂直玻璃，蓝色 T 和黄色 B 沿玻璃。在「俯视角度图」中可以对照 θ 从哪开始量。',
+      try:'先点「对照 0°」找到 +Z，再点「对照 −45°」看两条虚线，最后点「算例 −90°」看 N 转到 −X。',
+      more:'为什么算 B 时还要乘一个符号？', source:65, legend:frameLegend, controls:['turn']
+    },
+    'world-to-tangent': {
+      name:'像 Shadow 一样求第四列', title:'把 Shadow 的世界 → 灯光，换成世界 → 切线',
+      purpose:'Shadow 用 R、U、K 和灯光原点 O 建一套局部坐标。这里换成 T、B、N 和玻璃上的白点 P。图里的灰点 O 是场景原点，白点 P 才对应 Shadow 的灯光原点。',
+      caption:'从 O 量到 P，再把这一轴的零点移到 P',
+      flatHint:'青箭头连着世界原点 O 和玻璃点 P。彩色尺与 P 上选中的轴平行，暂时从 O 起量。虚线把 P 投到尺上。',
+      spaceHint:'看白点 P 到彩色尺的虚线。尺从 O 起量，图上箭头标出 P 在这一轴上的带符号读数。',
+      try:'依次点 T、B、N 行。对照彩色尺上的读数和高亮的第四格，它们相加等于 0。',
+      more:'为什么末尾补 1？', legend:originLegend, controls:['turn'],
+      choices:{key:'localAxis', label:'沿哪根局部轴读数', options:['T 行','B 行','N 行']}
+    },
+    'tangent-to-world': {
+      name:'求逆回世界', title:'反过来从切线到世界，为什么三根轴改放在列上？',
+      purpose:'这一步对应 Shadow 的灯光 → 世界。仍看同一个白点 P，沿用刚才的 T、B、N 和 P。把世界 → 切线的公式倒过来解。',
+      caption:'局部 (0, 0, 0) 对应白点 P 的世界位置',
+      flatHint:'彩色 T、B、N 从白点 P 出发。青色 OP 从世界原点走到 P，对应反向矩阵第四列的前三个数。',
+      spaceHint:'白点 P 上的 T、B、N 是前三列。青色 OP 对应第四列，把局部零点放回世界里的 P。',
+      try:'点「对照 −45°」，看前三列随玻璃一起转。玻璃绕 P 转，第四列 P 保持原值。',
+      more:'求逆时哪一部分转置？', legend:originLegend, controls:['turn']
     },
     matrix: {
-      name:'三根轴放三列', title:'沿 T 走 1 格，相当于沿世界轴怎么走？',
-      purpose:'从玻璃上的 P 出发。彩色的 T、B、N 是贴着玻璃的三个方向。世界 X、Y、Z 跟整个场景对齐。先用这两套轴找同一个终点。',
+      name:'三根轴放三列', title:'T、B、N 三列各记录哪一步？',
+      purpose:'上一步求出切线 → 世界的前三列。现在从同一个 P 出发，用三个单位位移验算。输入的末尾补 0 时，第 4 列 P 乘 0，只留下位移的三个世界分量。',
       caption:'沿选中的局部轴走一步，再用世界轴量',
-      flatHint:'彩色实箭头是沿所选局部轴走 1 格。青色分段按世界轴走，也到同一个彩色圆点。',
-      spaceHint:'彩色实箭头和青色路线都从 P 出发，都到同一个终点。灰色 O 是场景固定的原点。',
-      try:'先点「沿 T 走 1 格」。算例转到 −90° 时，沿蓝 T 走 1 格，就沿世界 +Z 走了 1 格。再试 B 和 N，观察表格哪一列亮起。',
-      more:'把任意三个局部用量代进去', source:72, legend:frameLegend, controls:['turn'], space:true,
+      flatHint:'实箭头和青色路线都从 P 出发，指向本次试走的终点。彩色虚线和圆点标出另外两列各自的方向和终点。',
+      spaceHint:'实箭头和青色路线都从 P 出发，指向本次试走的终点。灰色的世界轴从场景原点 O 出发。',
+      try:'保持「算例 −90°」，直接点表头「B 列」或「N 列」。看箭头的起点 P 和变化的终点，再用终点减 P。',
+      more:'怎么看矩阵的方向？', source:72, legend:frameLegend, controls:['turn'], space:true,
       choices:{key:'column', label:'只沿一根局部轴走', options:['沿 T 走 1 格','沿 B 走 1 格','沿 N 走 1 格']}
+    },
+    combine: {
+      name:'三列怎样拼出法线', title:'为什么这三列就能转换整支法线？',
+      purpose:'矩阵每列存的是沿那根局部轴走 1 格的世界位移。现在用贴图实际给出的三个数，把这三根单位箭头各缩放一次，从 P 首尾相接。',
+      caption:'用实际的 bump 逐段拼出同一支法线',
+      flatHint:'蓝、黄、绿分别用 T、B、N 那一列乘贴图给的长度。加完第三段，粉箭头从 P 直接连到 Q。',
+      spaceHint:'点击三段走法，观察下一段从哪里接上去。粉色 PQ 是三段走完后的总位移。',
+      try:'先看「只走 T」，再点「接上 B」和「接上 N」。每次新增一段，图下的世界位移也加上这一段。',
+      more:'P 和 Q 在图中分别代表什么？', source:82, legend:matrixLegend, controls:['tilt','turn'], space:true,
+      choices:{key:'legs', label:'从 P 逐段走', options:['只走 T','接上 B','接上 N']}
     },
     rows: {
       name:'三行怎么写', title:'第 72～74 行为什么每次从三根轴各取一个数？',
       purpose:'表的每一列回答「沿这根局部轴走一格」。每一行回答「这些走法各在同一根世界轴上走了多少」。Shader 按行存这张表。',
       caption:'从 T、B、N 各读同一个世界分量',
-      flatHint:'以 P 为量方向的起点。彩色箭头尖沿虚线投到青色的世界轴方向。',
-      spaceHint:'灰轴从世界原点 O 出发。在 P 处画一条平行的青线，可以从三根彩色箭头上读同一根世界轴的分量。',
+      flatHint:'青箭头是从 P 沿选中的世界轴走 1 格。彩色箭头尖沿虚线落到同一根世界轴上，给出这一行的三个数。',
+      spaceHint:'灰轴从世界原点 O 出发。青箭头是把选中的世界单位轴平移到 P，再用它读取三根彩色箭头的同一个世界分量。',
       try:'点「世界 X」、再点「世界 Z」，看高亮源码行、表格行和图上三个数一起切换。',
       more:'同一个字段的第四格装什么？', source:72, legend:frameLegend, controls:['turn'], space:true, choices:axisChoices
     },
     dot: {
-      name:'三个 dot 怎么算', title:'从三段局部走法算出一个世界分量',
-      purpose:'先只数世界 X。沿 T、B、N 的三段分别贡献一点世界 X，把三段的 X 加起来，就是粉箭头沿世界 X 的总位移。Y、Z 也这样数。',
-      caption:'把粉箭头投影到选中的世界轴',
-      flatHint:'青线是世界分量，从 P 沿选中的世界轴画出。青色虚线连接投影和粉箭头的端点。',
-      spaceHint:'青箭头与选中的世界轴平行，从 P 画起以便跟粉箭头比较。青虚线连到粉箭头端点。',
-      try:'按顺序点世界 X、Y、Z。每点一次，只追踪高亮的那个 dot，算式会用到表里高亮的一行。',
+      name:'三个 dot 怎么算', title:'为什么这里的 dot 就等于沿世界轴走了多少？',
+      purpose:'Shadow 的每一行选一根灯光轴来读数。这里每一行选一根世界轴，量粉箭头 PQ 在那根轴上走了多远。粉箭头和蓝、黄、绿三段折线共用起点 P 和终点 Q。',
+      caption:'数出三段各自在同一根世界轴上的位移',
+      flatHint:'彩色虚线把每段终点投到穿过 P 的世界轴上。看标有 T 段、B 段、N 段的刻度尺，每段位移等于这一段末尾的刻度减开头的刻度。',
+      spaceHint:'沿彩色虚线在世界轴上找各段终点的投影。刻度尺逐段显示这些读数。青箭头从零点 P 指到最后的投影。',
+      try:'点「看 −45° 的折返算例」。在世界 X 尺上，蓝段向右，黄段停在原刻度，绿段向左。再点 Y 或 Z 看同一条折线在另一根轴上的读数。',
       more:'为什么点积这里取 .xyz？', source:92, legend:[...matrixLegend,['sample','选中的世界分量']], controls:['tilt','turn'], space:true, choices:axisChoices
     },
     'normal-result': {
@@ -406,21 +515,21 @@
     },
     refraction: {
       name:'折射取色', title:'转动贴图法线，背景上哪个点会移动？',
-      purpose:'相机先拍下玻璃后面的墙。P 是要上色的玻璃像素，它在照片上对准的位置叫 A（白圈）。倾角控制从 A 横移、纵移多少，走到的位置叫 B（青点）。Shader 去 B 借墙色，送回 P。',
+      purpose:'相机先拍下玻璃后面的墙。P 是要上色的玻璃像素，它在照片上对准的位置叫 A（白圈）。把倾角给出的横、纵分量乘以偏移强度，就得到从 A 走到 B（青点）的偏移。Shader 去 B 借墙色，送回 P。',
       caption:'正看背景照片 · 局部放大', flatHint:'白圈 A 是起点，青点 B 是取色点。图中每格 16 个渲染像素，向右和向上分别是本图的 U、V 正方向。',
-      spaceHint:'虚线把玻璃上的 P 对应到背景照片上的 A。从 A 到 B 的箭头画在照片表面，是一次二维取色偏移。',
+      spaceHint:'彩色矩形代表相机的二维快照，图中放在玻璃后方，正对相机 C。玻璃面按自身转角摆放。紫色虚线从 C 穿过 P，到快照上的 A。青色箭头在快照上从 A 走到 B。',
       try:'把强度调到 40，依次点 0°、+30°、−30°。再保留一个斜角，把强度拖到 0，看青点落在哪里。',
       more:'展开 UV 换算，对照 Shader 的加法',
-      source:85, legend:[['ink','A 原位置'],['sample','B 实际取样'],['mapped','P 输出位置']], controls:['tilt','distortion']
+      source:85, legend:[['view','C → P → A · 相机视线'],['ink','A 原位置'],['sample','B 实际取样'],['mapped','P 输出位置']], controls:['tilt','distortion']
     },
     reflection: {
-      name:'白点 P 在哪', title:'frag 里的 worldPos 是图上哪个点？',
-      purpose:'白点 P 是正在着色的玻璃表面位置。灰点 O 是整个场景的原点 (0, 0, 0)。从 O 沿世界 X、Y、Z 各走多少才能到 P，这三个读数就是片元的 worldPos。',
-      caption:'从场景原点 O 沿三根轴走到白点 P',
-      flatHint:'沿图中 X、Y、Z 标的三段走完，终点是白点 P。青色标出当前要数的那一段。',
-      spaceHint:'先找 O，再沿三段标了 X、Y、Z 的路走到白点 P。青色高亮的是当前选中的分量。',
-      try:'依次点「世界 X」「世界 Y」「世界 Z」。每一项是到达白点 P 所需的一段位移。',
-      more:'蓝点与白点的关系', source:78, legend:positionLegend, controls:[], space:true, choices:axisChoices
+      name:'找到 P', title:'worldPos 就是玻璃上的白点 P',
+      purpose:'Shader 正在给白点 P 着色。先找到它在场景里的位置，下一步就能从 P 朝相机画出视线。',
+      caption:'白点 P 在玻璃面上',
+      flatHint:'从灰点 O 沿青色的 X、Y、Z 三段走到白点 P。',
+      spaceHint:'从灰点 O 沿青色的 X、Y、Z 三段走到白点 P。',
+      more:'展开三个 .w 的来源', source:78,
+      legend:[['ink','P · 正在着色的玻璃点'],['sample','从世界原点 O 走到 P']], controls:[], space:true
     },
     'vertex-pos': {
       name:'先算顶点', title:'为什么顶点也有一个 worldPos？',
@@ -442,12 +551,12 @@
     },
     'interp-pos': {
       name:'三个顶点到 P', title:'顶点的值怎样传到三角形中间的 P？',
-      purpose:'三个顶点各交出一份 o。GPU 按片元落在三角形中的位置，为它算一份 i。为了好算，图上选三角形重心作为 P，从边中点 H 往 Q2 走全程的 1/3 就到。',
-      caption:'从边中点 H 向 Q2 走到白点 P',
-      flatHint:'H 是 Q0、Q1 的中点。走完 H 到 Q2 这段路的 1/3 就到 P。',
-      spaceHint:'先找边中点 H。青箭头是 H 到 Q2 这一整段的前 1/3，箭头尖就是 P。',
+      purpose:'三个顶点各交出一份 o。GPU 按片元落在三角形中的位置，为它算一份 i。为了好算，图上选三角形重心作为 P，从边中点 M 往 Q2 走全程的 1/3 就到。',
+      caption:'从边中点 M 向 Q2 走到白点 P',
+      flatHint:'M 是 Q0、Q1 的中点。走完 M 到 Q2 这段路的 1/3 就到 P。',
+      spaceHint:'先找边中点 M。青箭头是 M 到 Q2 这一整段的前 1/3，箭头尖就是 P。',
       try:'先看世界 Y 对应的那一格，复算三个顶点各提供的值怎样合成 P 的值。',
-      more:'真实绘制时每个像素都取平均吗？', source:77, legend:[...positionLegend,['sample','H 到 P · 全段的 1/3']], controls:['turn'], space:true, choices:axisChoices
+      more:'真实绘制时每个像素都取平均吗？', source:77, legend:[...positionLegend,['sample','M 到 P · 全段的 1/3']], controls:['turn'], space:true, choices:axisChoices
     },
     'read-pos': {
       name:'读回 worldPos', title:'frag 第 78 行怎样从三个 .w 取回 P？',
@@ -459,34 +568,24 @@
       more:'worldPos 和 i.pos 各给出哪一种坐标？', source:78, legend:positionLegend, controls:[], space:true, choices:axisChoices
     },
     view: {
-      name:'相机位置减 P', title:'为什么相机位置要减去 worldPos？',
-      purpose:'P 是玻璃上的白点，C 是渲染相机的白点。两点坐标都从世界原点 O 量。现在改从 P 出发，计算每根世界轴还要走多少才能到 C。',
-      caption:'从 P 沿世界轴走到相机 C',
-      flatHint:'白箭头完整连接 P 到 C。青色折线逐轴标出这段位移。',
-      spaceHint:'白箭头就是相减的结果。沿青色的分段走，也会从 P 到相机 C。',
-      try:'拖「Shader 相机的世界 X」。从白点 P 看相机 C 和青色 X 段怎样一起改变。',
-      more:'为什么演示里的 Y 段没有画出？',
-      source:79, legend:[['ink','完整位移 · P 到 C'],['sample','逐根世界轴走过的距离']], controls:['cameraX'], space:true
-    },
-    'view-unit': {
-      name:'读出 worldViewDir', title:'worldViewDir 对应哪一根箭头？',
-      purpose:'第 79 行外面的 normalize 把从 P 指向 C 的整段位移缩成长度 1。图上从 P 出发的紫箭头，就是 worldViewDir。',
-      caption:'同一个方向，画出长度为 1 的紫箭头',
-      flatHint:'白虚线完整连到 C，紫箭头从 P 沿这条线朝 C 走 1 格。',
-      spaceHint:'白虚线是还没缩短的位移。紫箭头和它共用起点 P，朝向相同。',
-      try:'移动相机 C 看朝向怎么变。再拖动三维图换观察角度，比较图下两组三轴读数。',
-      more:'透视相机和正交相机的计算有什么差别？',
+      name:'算视线', title:'worldViewDir 从 P 指向相机 C',
+      purpose:'第 79 行用一次减法找到方向，再把箭头的长度调成 1。图上两条线都从白点 P 出发。',
+      caption:'同一条视线，两种长度',
+      flatHint:'白虚线连到相机 C。紫箭头沿同一方向走 1 格。',
+      spaceHint:'白虚线连到相机 C。紫箭头沿同一方向走 1 格。',
+      try:'拖动相机 X 滑块，观察白线和紫箭头怎样一起转向。',
+      more:'展开各轴相减和长度计算',
       source:79, legend:[['ink','白虚线 · 完整位移'],['view','紫箭头 · worldViewDir']], controls:['cameraX'], space:true
     },
     bounce: {
-      name:'reflect 与 Cubemap', title:'为什么 reflect 要传 −worldViewDir？',
-      purpose:'第 92 行已经把 bump 换成世界法线。第 93 行再把朝向玻璃的入射方向和这支法线交给 reflect，得到从 P 朝外的反射方向。',
-      caption:'俯视世界 X、Z 平面的反射',
-      flatHint:'白箭头沿 −V，橙箭头沿 R。箭头在俯视图中只显示 X、Z 分量。',
-      spaceHint:'白箭头从 C 朝玻璃，紫箭头从 P 指向 C，粉箭头是世界法线。橙箭头 R 决定取哪扇窗的颜色。',
-      try:'先把整块玻璃转回 0°，再切换「平整」和「正倾」。留意反射箭头 R 指向的窗，以及 P 收到的倒影色。',
-      more:'展开相机位置、反射向量和取色值',
-      source:93, legend:[...viewLegend,['mapped','nWS · 世界法线'],['ray','R · 反射']], controls:['tilt','turn','cameraX'], space:true
+      name:'取倒影', title:'沿橙色反射箭头去 Cubemap 取色',
+      purpose:'白箭头朝玻璃入射，粉箭头是 01 换到世界空间后的法线。reflect 用这两根箭头算出橙色反射方向。',
+      caption:'俯视 XZ 平面里的反射',
+      flatHint:'白箭头指向 P，橙箭头从 P 指向取色方向。俯视图显示它们的 X、Z 分量。',
+      spaceHint:'沿橙箭头找到环境贴图的彩色小面，那就是倒影取色的方向。',
+      try:'切换「平整」和「正倾」，看粉箭头变化时，橙箭头指向哪扇窗。',
+      more:'展开 reflect 的算式和 RGB 值',
+      source:93, legend:[['ink','入射 · −worldViewDir'],['mapped','世界法线 · bump'],['ray','反射 · reflDir']], controls:['tilt','turn'], space:true
     },
     mix: {
       name:'混合颜色', title:'透过玻璃看到的墙和玻璃上的倒影，各占多少？',
@@ -498,42 +597,49 @@
       source:100, legend:[['sample','背景图取色'],['ray','Cubemap 取色'],['mapped','P 输出位置']], controls:['amount']
     }
   };
-  const { measure, number, tuple, cssColor, pixel, originUV, bumpUV, faces, coordinateSteps } = GlassLab;
+  const { measure, normalLegs, number, tuple, cssColor, pixel, originUV, bumpUV, faces, coordinateSteps } = GlassLab;
   const sections = {
-    basis:['basis','sample','decode','frame','matrix','rows','dot','normal-result'],
+    basis:['basis','sample','decode','decode-foot','decode-z','frame','world-to-tangent','tangent-to-world','matrix','combine','rows','dot','normal-result'],
     refraction:['refraction'],
-    reflection:['reflection','vertex-pos','pack-pos','interp-pos','read-pos','view','view-unit','bounce'],
+    reflection:['reflection','view','bounce'],
     mix:['mix']
   };
   const stepOrder = Object.values(sections).flat();
+  const positionDetailSteps = ['vertex-pos','pack-pos','interp-pos','read-pos'];
+  const positionRoute = ['reflection', ...positionDetailSteps, 'view'];
   const paletteProperties = {t:'tangent',b:'bitangent',n:'normal',ink:'text'};
-  const focus = {axis:0, column:0, reading:0};
+  const focus = {axis:0, localAxis:0, column:0, legs:0, reading:0};
   let step = 'basis', data, viewChoice, wantsSpace = false, spaceStatus = 'idle';
   let drawSpace;
   let resetView = () => {};
+
+  function activeStepOrder() {
+    return positionDetailSteps.includes(step) ? positionRoute : stepOrder;
+  }
 
   function chooseFocus(key, value) {
     focus[key] = value;
     for (const button of byId('focus-tools').querySelectorAll('button')) {
       button.setAttribute('aria-pressed', String(Number(button.dataset.choice) === focus[key]));
     }
-    describe();
-    paintView();
+    refresh();
   }
 
   function setStep(next) {
     step = next;
     if (step === 'interp-pos') focus.axis = 1;
     const page = steps[step];
-    const section = Object.keys(sections).find(key => sections[key].includes(step));
+    const positionDetail = positionDetailSteps.includes(step);
+    const section = positionDetail ? 'reflection' : Object.keys(sections).find(key => sections[key].includes(step));
+    const substeps = positionDetail ? ['reflection', ...positionDetailSteps] : sections[section];
     document.querySelectorAll('[data-step]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.step === section)));
-    byId('subflow').hidden = sections[section].length < 2;
-    byId('subflow').replaceChildren(...sections[section].map(key => {
+    byId('subflow').hidden = substeps.length < 2;
+    byId('subflow').replaceChildren(...substeps.map(key => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'soft-button';
       button.dataset.substep = key;
-      button.textContent = steps[key].name;
+      button.textContent = positionDetail && key === 'reflection' ? '返回找到 P' : steps[key].name;
       button.setAttribute('aria-pressed', String(key === step));
       return button;
     }));
@@ -557,10 +663,13 @@
         controls.append(button);
       });
     }
-    ['purpose','try'].forEach(key => {byId(key).textContent=page[key];});
+    byId('purpose').textContent = page.purpose;
+    byId('try').textContent = page.try ?? '';
+    byId('try').parentElement.hidden = !page.try;
     byId('lesson-title').textContent = page.title;
     byId('more-title').textContent = page.more;
     byId('more').open = false;
+    byId('position-detail').hidden = step !== 'reflection';
     byId('legend').replaceChildren(...(page.legend ?? []).map(([palette,label]) => {
       const row = document.createElement('li'), dot = document.createElement('i');
       dot.style.setProperty('--ink',`var(--${paletteProperties[palette] ?? palette})`);
@@ -568,14 +677,17 @@
       return row;
     }));
     for (const name of Object.keys(inputs)) byId(name+'-control').hidden = !page.controls.includes(name);
+    byId('controls').hidden = page.controls.length === 0;
     byId('view-tools').hidden = Boolean(page.flatOnly);
+    byId('flat-view').textContent = step === 'frame' ? '俯视角度图' : '图解';
     byId('presets').hidden = !page.controls.includes('tilt');
     byId('branches').hidden = step !== 'basis';
     byId('readout').hidden = !['refraction','bounce','mix'].includes(step);
-    const stepIndex = stepOrder.indexOf(step);
-    const nextIndex = (stepIndex + 1) % stepOrder.length;
+    const order = activeStepOrder();
+    const stepIndex = order.indexOf(step);
+    const nextIndex = (stepIndex + 1) % order.length;
     byId('previous').hidden = stepIndex === 0;
-    byId('next').textContent = (nextIndex ? '下一步　' : '回到　') + steps[stepOrder[nextIndex]].name + ' →';
+    byId('next').textContent = (nextIndex ? '下一步　' : '回到　') + steps[order[nextIndex]].name + ' →';
     wantsSpace = !page.flatOnly && (viewChoice ?? Boolean(page.space));
     resetView();
     refresh();
@@ -605,6 +717,9 @@
   }
 
   function buildMatrix() {
+    byId('matrix').querySelectorAll('[data-column]').forEach(button => {
+      button.addEventListener('click', () => chooseFocus('column', Number(button.dataset.column)));
+    });
     byId('matrix-values').replaceChildren(...Array.from('XYZ', (axis, index) => {
       const row = document.createElement('tr');
       const heading = document.createElement('th'), name = document.createElement('strong');
@@ -629,9 +744,10 @@
 
   function showMatrix() {
     const captions = {
-      matrix:'高亮的一列是所选局部轴走一格的三个世界读数',
+      matrix:'每列记录一次独立的试走。点表头选择要在图中量的那一步。',
+      combine:'亮起的列代表图中已经走过的段，每列乘以自己的贴图读数。',
       rows:'高亮的一行从三根局部轴读取同一个世界分量',
-      dot:'每行点积的结果是粉箭头沿相应世界轴的位移',
+      dot:'一行的三个数依次是 T、B、N 各走 1 格时在该世界轴上走了多少。',
       'pack-pos':'当前顶点 Q0 的 o。青色 .w 一列存 Q0 的坐标',
       'read-pos':'当前片元 P 的 i。三行的 .w 依次给出 P 的世界 x、y、z'
     };
@@ -642,9 +758,18 @@
     byId('matrix-caption').textContent = captions[step];
     byId('matrix').querySelectorAll('[data-position]').forEach(cell => { cell.hidden = !carriesPosition; });
     byId('matrix').querySelectorAll('[data-result]').forEach(cell => { cell.hidden = step !== 'dot'; });
+    const columnActive = column => (step === 'matrix' && column === focus.column) ||
+      (step === 'combine' && column <= focus.legs);
     const headings = byId('matrix').querySelector('thead tr').cells;
     Array.from(headings).forEach((cell, index) => {
-      cell.classList.toggle('active-cell', step === 'matrix' && index === focus.column + 1);
+      const activeColumn = index >= 1 && index <= 3 && columnActive(index - 1);
+      cell.classList.toggle('active-cell', activeColumn);
+      const button = cell.querySelector('[data-column]');
+      if (button) {
+        button.hidden = step !== 'matrix';
+        cell.querySelector('[data-column-name]').hidden = step === 'matrix';
+        button.setAttribute('aria-pressed', String(activeColumn));
+      }
     });
     Array.from(byId('matrix-values').rows).forEach((row, axis) => {
       const button = row.querySelector('button');
@@ -656,11 +781,79 @@
       const slots = step === 'pack-pos' ? data.vertexSlots[0][axis] : data.fragmentSlots[axis];
       [...slots, data.rawWS[axis]].forEach((value, column) => {
         const cell = row.cells[column + 1];
-        cell.textContent = number(value, 3);
+        cell.textContent = number(value, step === 'dot' ? 5 : 3);
         cell.classList.toggle('active-cell', (carriesPosition && isRow && column === 3) ||
-          (step === 'matrix' && column === focus.column));
+          (column < 3 && columnActive(column)));
       });
     });
+  }
+
+  function showFrameTransform() {
+    const panel = byId('frame-transform');
+    const toLocal = step === 'world-to-tangent';
+    panel.hidden = !toLocal && step !== 'tangent-to-world';
+    if (panel.hidden) return;
+    const inputAxes = toLocal ? 'XYZ' : 'TBN';
+    const outputAxes = toLocal ? 'TBN' : 'XYZ';
+    const rows = toLocal ? data.worldToTangent : data.fragmentSlots;
+    panel.dataset.direction = toLocal ? 'to-local' : 'to-world';
+    byId('frame-transform-caption').textContent = toLocal
+      ? '世界 → 切线　·　每一行读取一根局部轴，第四列把零点移到 P'
+      : '切线 → 世界　·　每一列给出一根局部轴的世界方向，第四列给出 P';
+    const headers = panel.querySelector('thead tr').cells;
+    Array.from(inputAxes).forEach((axis, index) => { headers[index + 1].textContent = axis; });
+    panel.querySelector('tbody').replaceChildren(...[...rows, [0, 0, 0, 1]].map((values, index) => {
+      const row = document.createElement('tr'), heading = document.createElement('th');
+      const selected = toLocal && index === focus.localAxis;
+      row.classList.toggle('selected', selected);
+      heading.scope = 'row';
+      heading.textContent = outputAxes[index] ?? 'w';
+      row.append(heading);
+      values.forEach((value, column) => {
+        const cell = row.insertCell();
+        cell.textContent = number(value, 4);
+        cell.classList.toggle('active-cell', column === 3 && (toLocal ? selected : index < 3));
+      });
+      return row;
+    }));
+  }
+
+  function showProjection(axis, legs, expression) {
+    const worldAxis = 'XYZ'[axis];
+    const origin = data.worldPos[axis];
+    const total = data.rawWS[axis];
+    const signed = value => (value >= .000005 ? '+' : '') + number(value, 5);
+    const ranges = legs.map(({from, to, delta}, index) =>
+      [`${'TBN'[index]} 段`, ['t','b','n'][index], from[axis] - origin, to[axis] - origin, delta[axis]]);
+    ranges.push(['合计', 'sample', 0, total, total]);
+    byId('projection-title').textContent = `世界 ${worldAxis} 尺上的三段位移`;
+    byId('projection-dot').textContent = expression;
+    byId('projection-result').textContent = `≈ ${number(total, 5)}`;
+    byId('projection-example').setAttribute('aria-pressed', String(data.turn === -45 && data.tilt === 30 && axis === 0));
+    byId('projection-legs').replaceChildren(...ranges.map(([name, color, start, end, delta]) => {
+      const row = document.createElement('div');
+      const label = document.createElement('samp'), value = document.createElement('samp');
+      const reading = document.createElement('div'), track = document.createElement('span');
+      const segment = document.createElement('span'), endpoints = document.createElement('samp');
+      row.className = 'projection-line';
+      row.style.setProperty('--segment-ink', `var(--${paletteProperties[color] ?? color})`);
+      label.textContent = name;
+      value.textContent = signed(delta);
+      reading.className = 'projection-reading';
+      track.className = 'projection-track';
+      track.setAttribute('aria-hidden', 'true');
+      endpoints.className = 'projection-endpoints';
+      endpoints.textContent = `${number(start, 5)} → ${number(end, 5)}`;
+      segment.className = 'projection-segment';
+      segment.classList.toggle('zero', Math.abs(delta) < .000005);
+      segment.classList.toggle('reverse', delta < 0);
+      segment.style.left = `${(1 + Math.min(start, end)) * 50}%`;
+      segment.style.width = `${Math.abs(delta) * 50}%`;
+      track.append(segment);
+      reading.append(track, endpoints);
+      row.append(label, reading, value);
+      return row;
+    }));
   }
 
   function pictureValues(entries) {
@@ -709,7 +902,7 @@
   }
 
   function describe() {
-    const { tilt, turn, packedNormal, ts, tangent, bitangent, normal, rows, rawWS, ws, verticesWS, vertexSlots,
+    const { tilt, turn, packedNormal, ts, planarLengthSquared, planarLength, tangent, bitangent, normal, rows, rawWS, ws, verticesWS, vertexSlots,
       fragmentSlots, worldPos, camera,
       viewDelta, viewLength, viewDir, incident, alongNormal, reflected, face, wall,
       distortion, offsetPx, offsetUV, samplePx, uv, amount, reflCol, refrCol, finalCol } = data;
@@ -720,8 +913,19 @@
     const axis = focus.axis;
     const worldAxis = 'XYZ'[axis], field = 'xyz'[axis];
     const source = ['rows','pack-pos'].includes(step) ? 72 + axis : steps[step].source;
-    byId('source-link').href = shader + '#L' + source;
+    const librarySource = step === 'decode-z';
+    const shadowLink = {
+      'world-to-tangent': ['世界 → 灯光 ↗', 'view-first-row'],
+      'tangent-to-world': ['灯光 → 世界 ↗', 'light-to-world-use']
+    }[step];
+    const sourceLink = byId('source-link');
+    byId('source-title').textContent = shadowLink ? '对照 Shadow 篇' :
+      librarySource ? 'URP 14.0.12 · Packing.hlsl' : '对照第 10 章 Shader';
+    sourceLink.textContent = shadowLink ? shadowLink[0] : '打开源码 ↗';
+    sourceLink.href = shadowLink ? `Chapter09-Shadow-QA.md#${shadowLink[1]}` : (librarySource ? packingShader : shader) + '#L' + source;
+    byId('projection').hidden = step !== 'dot';
     pictureValues([]);
+    showFrameTransform();
     showMatrix();
     if (step === 'basis') {
       lesson([
@@ -751,74 +955,231 @@
           '本章把两对二维贴图坐标存进同一个 float4。片元写 .zw 就是取后两个数，把它们作为一次二维取样的 (u, v)。']
       ]);
     } else if (step === 'decode') {
-      const [alongT, alongB, alongN] = ts;
+      const [alongT, alongB] = ts;
       const [red, green, , alpha] = packedNormal;
-      const planarLengthSquared = alongT * alongT + alongB * alongB;
+      pictureValues([
+        ['蓝段 x', number(alongT, 3), 't'],
+        ['黄段 y', number(alongB, 3), 'b']
+      ]);
       lesson([
         ['把通道里的 0.5 还原为方向分量 0', [
           `输入 RGBA ≈ ${tuple(packedNormal, 4)}`,
           `x = 2 × (${number(red, 4)} × ${alpha}) − 1 ≈ ${number(alongT, 3)}`,
           `y = 2 × ${number(green, 4)} − 1 ≈ ${number(alongB, 3)}`
         ], '方向分量有正有负。存进 0 到 1 的通道时，先把分量除以 2 再加 0.5。读取时乘 2 减 1，就把 0、0.5、1 依次还原成 −1、0、+1。URP 在这个分支取 R × A 和 G。', [82]],
-        ['用长度 1 补出朝外的 z', [
-          'x² + y² + z² = 1',
-          `x² + y² ≈ (${number(alongT, 3)})² + (${number(alongB, 3)})² ≈ ${number(planarLengthSquared, 4)}`,
-          `z ≈ √(1 − ${number(planarLengthSquared, 4)}) ≈ ${number(alongN, 3)}`
-        ], '本例存的是表面朝外的单位法线。知道 x、y 后，从总长度的平方 1 里减去前两项的平方。对剩下的数开正平方根，得到沿网格法线 N 朝外的分量。'],
-        ['从 P 把这三个数画出来', [
+        ['用蓝段和黄段在玻璃上找到 H', [
           `蓝 T · 沿玻璃纹理横向走 ${number(alongT, 3)}`,
-          `黄 B · 沿玻璃纹理纵向走 ${number(alongB, 3)}`,
-          `绿 N · 垂直玻璃向外走 ${number(alongN, 3)}`,
-          `粉箭头 bump ≈ ${vecText(ts)}`
-        ], '沿着图中三根局部轴走完三段，粉箭头就是从 P 连到最后的终点。比如平整样本的前两项都是 0，只沿 N 走 1。用 T、B、N 来量方向，就叫切线空间。']
+          `黄 B · 沿玻璃纹理纵向走 ${number(alongB, 3)}`
+        ], '从白点 P 出发，先走蓝段，再走黄段，就停在玻璃上的青点 H。粉箭头尖 Q 在 H 上方。下一步先量玻璃上的直线距离 PH，再算从 H 到 Q 的高度。']
       ], [
         ['URP 14.0.12 的取样布局', 'RG 或 AG 取决于纹理格式与编译分支',
           '这里代入的是 URP 14.0.12 的 RG 布局。两通道解码也能处理第一个数放在 A、R 为 1 的布局，R 与 A 相乘以后统一取用。另有直接对 RGB 三项作 2c−1 的分支。']
       ]);
-    } else if (step === 'frame') {
+    } else if (step === 'decode-foot') {
+      const [alongT, alongB] = ts;
       pictureValues([
-        ['蓝 T · 世界读数', vecText(tangent), 't'],
-        ['黄 B · 世界读数', vecText(bitangent), 'b'],
-        ['绿 N · 世界读数', vecText(normal), 'n']
+        ['蓝段 x', number(alongT, 5), 't'],
+        ['黄段 y', number(alongB, 5), 'b'],
+        ['青色 PH', number(planarLength, 5), 'sample']
       ]);
       lesson([
-        ['网格在模型空间提供 normal 和 tangent', ['v.normal = (0, 0, 1)', 'v.tangent = (1, 0, 0, +1)'],
-          '模型空间用玻璃自己的轴量。示例玻璃平铺在模型 XY 面，纹理 U 朝模型 +X，法线朝模型 +Z。tangent.xyz 给出 U 的方向，tangent.w 是决定 B 朝哪一侧的符号。', [42,43]],
-        ['把 T、N 转到世界空间', [
-          `T = (cos θ, 0, −sin θ) ≈ ${vecText(tangent)}　· 蓝`,
-          `N = (sin θ, 0, cos θ) ≈ ${vecText(normal)}　· 绿`
-        ],
-          `URP 14.0.12 用 TransformObjectToWorldDir 转 T，用 TransformObjectToWorldNormal 转 N。当前物体绕世界 Y 转 ${turn}°，只看旋转就能算出这两个方向。图里的箭头摆在 P 上，三个数用世界轴来量。`, [65,67,68]],
-        ['叉乘得到沿纹理纵向的 B', `B = cross(${vecText(normal)}, ${vecText(tangent)}) × (+1) ≈ ${vecText(bitangent)}　· 黄`,
+        ['在玻璃上找第一个直角', [
+          `蓝段沿 T 走 x ≈ ${number(alongT, 5)}`,
+          `黄段沿 B 走 y ≈ ${number(alongB, 5)}`
+        ], '沿蓝段转 90°，再沿黄段走到 H。直接连 P 和 H 就得到斜边 PH。'],
+        ['用两条直角边求斜边 PH', [
+          '勾股定理　斜边² = 第一条直角边² + 第二条直角边²',
+          `PH² = x² + y² ≈ (${number(alongT, 5)})² + (${number(alongB, 5)})² ≈ ${number(planarLengthSquared, 5)}`,
+          `PH ≈ √${number(planarLengthSquared, 5)} ≈ ${number(planarLength, 5)}`
+        ], '先算蓝段和黄段各自的平方，再加起来。这个和就是青色 PH 的平方，开平方得到它的长度。下一幅图会用这条 PH 作底边。']
+      ], [
+        ['分量的正负决定走向', '蓝段长度 = |x|，黄段长度 = |y|',
+          '负号表示沿对应轴的反方向走。比如 −0.4 和 +0.4 的平方都是 0.16，所以找斜边时可以直接平方带符号的分量。']
+      ]);
+    } else if (step === 'decode-z') {
+      const outward = ts[2];
+      const outwardSquared = 1 - planarLengthSquared;
+      pictureValues([
+        ['青色底边 PH', number(planarLength, 5), 'sample'],
+        ['粉色斜边 PQ', '1', 'mapped'],
+        ['绿色直角边 z', number(outward, 5), 'n']
+      ]);
+      lesson([
+        ['为什么粉箭头长 1？', 'PQ = 1 格',
+          '法线贴图记录小面的朝向。沿同一个方向画长一点或短一点，朝向都一样。因此，这种两通道编码先约定箭头统一长 1 格，再存 x、y。解码用这个约定找回 z。'],
+        ['在 H 找第二个直角', [
+          `PH² ≈ ${number(planarLengthSquared, 5)}　　PQ² = 1²`,
+          'PH² + z² = PQ²',
+          `z² ≈ 1 − ${number(planarLengthSquared, 5)} ≈ ${number(outwardSquared, 5)}`,
+          `绿段长度 ≈ √${number(outwardSquared, 5)} ≈ ${number(outward, 5)}`
+        ], '青色 PH 躺在玻璃上，绿色 HQ 垂直于玻璃，所以它们在 H 成直角。勾股定理说，两条直角边的平方加起来等于斜边的平方。减掉已知的 PH²，就剩绿段的平方。开平方才得到绿段的长度。'],
+        ['为什么写成正的 z？', [
+          `沿 +N 朝外　z ≈ +${number(outward, 5)}`,
+          `朝玻璃里　z ≈ −${number(outward, 5)}`
+        ], '从 H 朝两侧各走同样远，都能连出长度为 1 的粉箭头。玻璃外侧是 +N，这种编码约定记录朝外的法线，所以取上方的 Q，给 z 加正号。'],
+        ['对应到 UnpackNormal 的补 z 代码', `dot(normal.xy, normal.xy) = x² + y² ≈ ${number(planarLengthSquared, 5)}`,
+          '点积先算出青色底边的平方。用 1 减这个数，再调用 sqrt，就是图中求绿段长度的过程。', [185], {line:185, text:'sqrt(1.0 - saturate(dot(normal.xy, normal.xy)))'}]
+      ], [
+        ['解码时的数值保护', 'saturate 把 x² + y² 限制在 [0, 1]，max 给 z 设极小的下限',
+          '压缩和过滤后的通道值可能有误差。把平方和限制到 1 以内，可以确保开平方的输入大于等于 0。']
+      ]);
+    } else if (step === 'frame') {
+      const degrees = `${String(turn).replace('-', '−')}°`;
+      pictureValues([
+        ['玻璃转角 θ', degrees, 'b'],
+        ['绿色箭头 N', vecText(normal), 'n'],
+        ['蓝色箭头 T', vecText(tangent), 't'],
+        ['黄色箭头 B', vecText(bitangent), 'b']
+      ]);
+      lesson([
+        ['从 0° 的 +Z 开始量 θ', [
+          `当前 θ = ${degrees}`,
+          '玻璃转到 0° 时，N = (0, 0, 1)，指向世界 +Z'
+        ], '示例玻璃平铺在模型 XY 面，网格给出的法线 v.normal 沿模型 +Z。物体摆在 0° 时，模型的 +Z 与世界的 +Z 同向。俯视图的弧线从那里开始，正角朝 +X 转，负角朝 −X 转。', [42,43]],
+        ['用世界 X、Y、Z 读绿色箭头 N', [
+          `X = sin(${degrees}) ≈ ${number(normal[0], 3)}`,
+          'Y = 0',
+          `Z = cos(${degrees}) ≈ ${number(normal[2], 3)}`,
+          `N = (sin θ, 0, cos θ) ≈ ${vecText(normal)}`
+        ], '绿色 N 的长度是 1。从 +Z 量角时，图上的 Z 段紧挨着角，用余弦 cos 量。X 段在角的对面，向左时取负，用正弦 sin 量。绕 Y 旋转时，N 一直在 XZ 平面里，Y 分量为 0。'],
+        ['把箭头对应到 Shader 的字段', [
+          `绿色箭头 N（worldNormal）≈ ${vecText(normal)}`,
+          `蓝色箭头 T（worldTangent）≈ ${vecText(tangent)}`
+        ], '绿色和蓝色是图例标签。蓝色 T 从世界 +X 起转，和 N 一起绕 Y 转过同一个 θ。URP 14.0.12 的 GetVertexNormalInputs 把输入的模型法线和切线转到世界空间，再由第 67、68 行读出。', [65,67,68]],
+        ['叉乘得到沿纹理纵向的黄色 B', `B = cross(${vecText(normal)}, ${vecText(tangent)}) × (+1) ≈ ${vecText(bitangent)}`,
           'cross(N, T) 生成同时垂直 N、T 的方向，落在玻璃表面。URP 再乘 tangent.w 与模型镜像缩放的符号。算例的两个符号都为 +1。玻璃绕 Y 转动时，黄色 B 仍沿世界 +Y。', [69]]
       ], [
         ['UV 手性与镜像缩放', 'tangentOS.w × GetOddNegativeScale()',
           '叉乘先选定一个方向，符号决定要不要翻转它。tangentOS.w 记录网格 UV 的手性，GetOddNegativeScale() 记录模型变换是否翻转了手性。']
       ]);
+    } else if (step === 'world-to-tangent') {
+      const localAxis = focus.localAxis;
+      const name = 'TBN'[localAxis];
+      const color = ['t','b','n'][localAxis];
+      const fourthColumn = data.worldToTangent.map(row => row[3]);
+      const offset = number(fourthColumn[localAxis], 4);
+      const reading = number(-fourthColumn[localAxis], 4);
+      const direction = data.worldToTangent[localAxis].slice(0, 3);
+      pictureValues([
+        ['青色 OP · P 的世界坐标', vecText(worldPos), 'sample'],
+        [`彩色尺 · 以 O 为零点读 ${name}`, reading, color],
+        [`把零点移到 P，P 的 ${name} 读数`, `${reading} + (${offset}) = 0`, color]
+      ]);
+      lesson([
+        [`沿 ${name} 读数，该行前三格就填 ${name}`, [
+          'Shadow 的 R、U、K → 玻璃的 T、B、N',
+          `第 ${localAxis + 1} 行前三格 = ${name} 的世界分量 ≈ ${tuple(direction, 4)}`,
+          '记 E = [T B N]。把三根轴转成行，就得到这里的前三行前三格 Eᵀ。'
+        ], `输入按世界 X、Y、Z 写。输出的 ${name} 分量要沿 ${name} 量，所以用 ${name} 的世界分量做这一行。图上把 ${name} 平移到 O，再把青色 OP 投到彩色尺上，此时读到 ${reading}。`],
+        [`让 P 在 ${name} 上的读数归零`, [
+          `${name} · P + 第四格 × 1 = 0`,
+          `${reading} + 第四格 = 0　→　第四格 ≈ ${offset}`
+        ], '和 Shadow 一样，把点 P 的输入写成四个数，末尾补 1。第四格乘 1 后加进这一行。P 是切线空间的原点，所以三行各自加上能把 P 的读数抵消的数。'],
+        ['组装并用 P 验算', [
+          `EᵀP ≈ ${tuple(fourthColumn.map(value => -value), 4)}，第四列前三格 −EᵀP ≈ ${tuple(fourthColumn, 4)}`,
+          '世界 → 切线　pTS = Eᵀ pWS − Eᵀ P = Eᵀ(pWS − P)',
+          `验算　P ${vecText(worldPos)} → Eᵀ(P − P) = (0, 0, 0)，w 仍为 1`
+        ], '上式中的 pWS 和 pTS 是同一个点的世界和切线坐标。括号里的 pWS − P 是从新原点 P 指向这个点的位移，再沿三根局部轴读数。']
+      ], [
+        ['末尾的 1', '点的坐标 (X, Y, Z, 1)',
+          '前三行用末尾的 1 把自己的第四格加一次。最后一行 (0, 0, 0, 1) 输出这个 1。']
+      ]);
+    } else if (step === 'tangent-to-world') {
+      pictureValues([
+        ['白点 P · 从局部原点起量', '(0, 0, 0, 1)'],
+        ['青色 OP · 从世界原点起量', tuple([...worldPos, 1], 4), 'sample']
+      ]);
+      lesson([
+        ['两边乘 E，消掉 Eᵀ', [
+          '已知　pTS = Eᵀ(pWS − P)',
+          '两边左乘 E　E pTS = E Eᵀ(pWS − P) = pWS − P',
+          '两边加 P　pWS = E pTS + P'
+        ], '本例的 T、B、N 各长 1，彼此垂直。EᵀE 中同一根轴的点积为 1，不同轴的点积为 0，所以 EᵀE 是单位矩阵。E 是 3×3 方阵，Eᵀ 与 E 互为逆，反过来相乘也是单位矩阵。'],
+        ['前三列跟着 T、B、N，第四列加 P', [
+          `E = [T B N]　T ≈ ${vecText(tangent)}，B ≈ ${vecText(bitangent)}，N ≈ ${vecText(normal)}`,
+          '反向的 4×4 矩阵，上三行是 [E | P]，末行是 (0, 0, 0, 1)',
+          '灯光 → 世界的同一写法是上三行 [R U K | O]'
+        ], '沿 T 走的格数乘 T 列，沿 B、N 走的格数各乘对应的列。三段世界位移相加后还要加 P，才得到点的世界位置。图上彩色三轴从 P 出发，青色 OP 给出这个起点的世界坐标。'],
+        ['用切线原点验算反向矩阵', [
+          `输入 (0, 0, 0, 1)　→　0 × T + 0 × B + 0 × N + 1 × P`,
+          `输出 ${tuple([...worldPos, 1], 4)}　→　图上的白点 P`
+        ], '前三列的输入都为 0，只剩第 4 列。上一步把白点的世界位置换成了局部零点，这一步把局部零点换回同一个白点。']
+      ], [
+        ['左上 3×3 与第四列', 'Eᵀ → E，−EᵀP → P',
+          '推导中用到转置的是正交单位基底的 3×3 部分。第四列由 pWS = E pTS + P 得到。']
+      ]);
     } else if (step === 'matrix') {
       const column = focus.column;
-      const [name, color, direction] = [['T','t',tangent], ['B','b',bitangent], ['N','n',normal]][column];
+      const axes = [
+        {name:'T', color:'t', description:'蓝 T', atZero:'+X', direction:tangent, field:'worldTangent'},
+        {name:'B', color:'b', description:'黄 B', atZero:'+Y', direction:bitangent, field:'worldBinormal'},
+        {name:'N', color:'n', description:'绿 N', atZero:'+Z', direction:normal, field:'worldNormal'}
+      ];
+      const {name, color, direction, field} = axes[column];
       const localInput = [0, 0, 0];
       localInput[column] = 1;
       const tip = worldPos.map((value, index) => value + direction[index]);
+      const strongestAxis = direction.reduce((best, value, index) =>
+        Math.abs(value) > Math.abs(direction[best]) ? index : best, 0);
+      const readAxis = 'XYZ'[strongestAxis];
+      const readField = `${field}.${'xyz'[strongestAxis]}`;
+      const readValue = number(direction[strongestAxis], 3);
+      const degrees = `${String(turn).replace('-', '−')}°`;
       pictureValues([
-        [`沿 ${name} 走 1 格`, vecText(localInput), color],
-        ['同一段用世界轴量', vecText(direction), 'sample'],
-        ['共同的箭头尖', vecText(tip)]
+        ['共同起点 P', vecText(worldPos)],
+        [`${name} 的箭头尖`, vecText(tip), color],
+        ['世界位移＝终点减 P', vecText(direction), 'sample']
       ]);
       lesson([
-        [`从 P 沿 ${name} 走 1 格`, [
-          `按 T、B、N 记这段位移 = ${vecText(localInput)}`,
-          `按世界 X、Y、Z 记这段位移 ≈ ${vecText(direction)}`,
-          `P ${vecText(worldPos)} + 这段位移 ≈ ${vecText(tip)}`
-        ], '先在图上找彩色箭头的尾和尖。两种读法都从同一个箭尾 P 出发。用世界轴分段走到彩色箭头尖，分段的三个数就是这根局部轴的世界读数。玻璃转到 −45° 时可以看到分开的 X、Z 两段。'],
-        [`把这三个世界读数竖着填入第 ${column + 1} 列`, [
-          `${name} 列从上到下 ≈ ${vecText(direction)}`,
-          '第一列 × 沿 T 的用量 + 第二列 × 沿 B 的用量 + 第三列 × 沿 N 的用量'
-        ], `每一列存一根轴走 1 格的世界位移。例子只沿 ${name} 走，所以只有表中高亮的那一列乘 1，其余两列乘 0。一般的输入会给三根轴不同的用量，分别乘完再相加。Shader 第 72～74 行把这张表横着存，下一步看它怎样取一行。`]
+        ['先看三根轴随玻璃一起转', axes.map(({description, atZero, direction}) =>
+          `${description}　0° 时沿 ${atZero} → ${degrees} 时的世界方向 ${vecText(direction)}`
+        ), '玻璃在 0° 时，蓝 T、黄 B、绿 N 分别沿世界 +X、+Y、+Z。现在绕世界 Y 转，黄 B 与转轴同向，一直向上。蓝 T 和绿 N 随玻璃在 XZ 平面内转。算例 −90° 时，绿 N 从 +Z 转到 −X，蓝 T 从 +X 转到 +Z。'],
+        [`从 P 单独沿 ${name} 走 1 格`, [
+          `P ${vecText(worldPos)} → ${name} 的箭头尖 ${vecText(tip)}`,
+          ...direction.map((value, index) =>
+            `世界 ${'XYZ'[index]} 位移 ≈ ${number(tip[index], 3)} − (${number(worldPos[index], 3)}) ≈ ${number(value, 3)}`
+          ),
+          `${name} 列 ≈ ${vecText(direction)}`
+        ], `这列量的是箭头的位移。用它的终点坐标逐个减去起点 P，三个差值就依次填入世界 X、Y、Z 行。高亮代码把这个 ${name} 的世界 ${readAxis} 分量 ${readValue} 写进第 ${72 + strongestAxis} 行。`, [72,73,74],
+          {line:72 + strongestAxis, text:readField}],
+        ['选的是这一次试走', [
+          `本次沿 T、B、N 的用量 = ${vecText(localInput)}`,
+          `位移输入 ${tuple([...localInput, 0], 4)} → ${tuple([...direction, 0], 4)}`,
+          `${localInput[0]} × T 列 + ${localInput[1]} × B 列 + ${localInput[2]} × N 列 ≈ ${vecText(direction)}`
+        ], `这次沿 ${name} 走 1 格，另外两根轴走 0 格。对应的矩阵乘法恰好取 ${name} 列，和图上终点减起点的结果相同。`]
       ], [
-        ['任意输入按列相加', '世界位移 = bump.x × T + bump.y × B + bump.z × N',
-          '右边的 T、B、N 都已用世界分量表示，每一项都是一段可按世界轴读的位移。把这三段首尾接起来，就得到了粉箭头。']
+        ['位移的末尾补 0', `箭头尖的世界位置 − 箭尾的世界位置 = (P + ${name}) − P = ${name}`,
+          '沿局部轴走的这一步是位移。把起点和终点分别换到世界再相减，两次加上的同一个 P 会抵消。这等价于给位移补 0，省去第 4 列。下一步用 bump 给出的实际距离走完三段。']
+      ]);
+    } else if (step === 'combine') {
+      const legs = normalLegs(data);
+      const current = focus.legs;
+      const leg = legs[current];
+      const axisName = 'TBN'[current];
+      const color = ['t','b','n'][current];
+      const column = [tangent, bitangent, normal][current];
+      const untilNow = leg.to.map((value, index) => value - worldPos[index]);
+      const endpoint = current === 2 ? 'Q' : `P${current + 1}`;
+      const startpoint = current === 0 ? 'P' : `P${current}`;
+      const terms = legs.slice(0, current + 1).map(({weight}, index) => `${number(weight, 4)} × ${'TBN'[index]} 列`);
+      pictureValues([
+        ['贴图的三个读数 · T、B、N', vecText(ts), 'mapped'],
+        [`${axisName} 段的世界位移`, vecText(leg.delta), color],
+        [`从 P 到 ${endpoint} 的世界位移`, vecText(untilNow), current === 2 ? 'mapped' : 'sample']
+      ]);
+      lesson([
+        [`把本次 ${axisName} 段按贴图给的距离缩放`, [
+          `bump.${'xyz'[current]} ≈ ${number(leg.weight, 4)}　沿 ${axisName} 走的格数`,
+          `${number(leg.weight, 4)} × ${vecText(column)} ≈ ${vecText(leg.delta)}　这段的世界位移`,
+          `${startpoint} ${vecText(leg.from)} → ${endpoint} ${vecText(leg.to)}`
+        ], `第 82 行读到的 bump 依次说明沿 T、B、N 走多少格。用其中第 ${current + 1} 个数乘 ${axisName} 列，得到图中这段彩色箭头的三个世界分量。`, [82], {line:82, text:'bump'}],
+        ['首尾接起来，就把世界位移相加', [
+          `${terms.join(' + ')} ≈ ${vecText(untilNow)}`,
+          '走完三段：世界位移 PQ = bump.x × T + bump.y × B + bump.z × N'
+        ], '每段的终点是下一段的起点。沿折线走完和直接沿粉箭头走会到同一个 Q，所以三段的世界位移相加就是法线的世界读数。接着看「三行怎么写」，把三个向量的加法改成一根世界轴一根世界轴地算。']
+      ], [
+        ['画箭头用的位置与方向', '图上的箭头尖 Q = P + 三段世界位移',
+          'P 用来把箭尾摆在玻璃上。法线要存的是箭尾到箭头尖的位移，也就是 Q − P。']
       ]);
     } else if (step === 'rows') {
       const row = rows[axis];
@@ -837,35 +1198,47 @@
           `o.TtoW${axis}.x = T.${field}`,
           `o.TtoW${axis}.y = B.${field}`,
           `o.TtoW${axis}.z = N.${field}`
-        ], `float4 有四格，.x、.y、.z、.w 依次是第一、二、三、四格。这里 .xyz 一次拿到前三格。选中整行时，它们都在回答世界 ${worldAxis}，顺序对应 T、B、N。本算例是平面，三个顶点的这三列相同，所以片元读到的前三格也相同。`]
+        ], `float4 有四格，.xyz 一次拿到前三格。选中整行时，它们都在回答世界 ${worldAxis}，顺序对应 T、B、N。本算例是平面，三个顶点的三列相同，所以片元读到的前三格也相同。`],
+        [`沿 Shadow 的读法，量青色 e_${worldAxis} 在 T、B、N 上的分量`, [
+          `e_${worldAxis} 是沿世界 +${worldAxis} 走一格的单位向量`,
+          `(T · e_${worldAxis}, B · e_${worldAxis}, N · e_${worldAxis}) = (T.${field}, B.${field}, N.${field}) ≈ ${tuple(row, 4)}`
+        ], `青箭头在世界坐标里只沿 ${worldAxis} 走一格。拿世界 → 切线的三行去读这支箭头，每行的点积就只留下本轴的 ${worldAxis} 分量。读出的三个局部分量恰好就是这条 TtoW 行里的三个数。`]
       ], [
         ['第四格 .w', 'o.TtoW0.w = 顶点的世界 x',
           '到了「位置与视线 → 写进 .w」，可以看到这三条相同的赋值语句怎样把位置装进去。']
       ]);
     } else if (step === 'dot') {
       const row = rows[axis];
-      const contributions = row.map((component, index) => component * ts[index]);
-      const terms = row.map((component, index) => `(${number(component, 3)} × ${number(ts[index], 3)})`);
+      const legs = normalLegs(data);
+      const contributions = legs.map(({delta}) => delta[axis]);
+      const terms = row.map((component, index) => `(${number(component, 5)} × ${number(ts[index], 5)})`);
       const excerpt = `dot(i.TtoW${axis}.xyz, bump)`;
+      const ends = ['P1','P2','Q'];
+      const origin = worldPos[axis];
+      const tick = value => number(value - origin, 5);
+      showProjection(axis, legs, excerpt);
       pictureValues([
-        ['粉箭头 · 贴图的旧 bump', vecText(ts), 'mapped'],
-        ...contributions.map((value, index) => [`${'TBN'[index]} 段的世界 ${worldAxis}`, number(value, 3), ['t','b','n'][index]]),
-        [`青箭头 · 世界 ${worldAxis}`, number(rawWS[axis], 3), 'sample']
+        ['贴图读数 · T、B、N', vecText(ts), 'mapped'],
+        [`读数轴 e_${worldAxis} · 换成 T、B、N`, tuple(row, 4), 'sample'],
+        [`青箭头 · 世界 ${worldAxis} 合计`, number(rawWS[axis], 5), 'sample']
       ]);
       lesson([
-        ['先看高亮的一个 dot', [
-          `i.TtoW${axis}.xyz ≈ ${vecText(row)}　按 T、B、N 取世界 ${worldAxis}`,
-          `右边的 bump ≈ ${vecText(ts)}　按 T、B、N 给出走多少`
-        ], `图里从 P 开始的蓝、黄、绿三段分别沿 T、B、N 走。第 ${axis + 1} 个 dot 要回答，把这三段走完，合计在世界 ${worldAxis} 上移动了多少。`, [92], {line:92, text:excerpt}],
-        ['对应的两项相乘，看每段贡献多少', terms.map((term, index) =>
-          `${'TBN'[index]} 段的 ${worldAxis} 位移 = ${term} ≈ ${number(contributions[index], 3)}`
-        ), `以蓝段为例。沿 T 走 1 格，它对世界 ${worldAxis} 的贡献是 T.${field}。沿 T 走 bump.x 格，就把这个贡献乘 bump.x。黄、绿两段同样乘。`],
-        ['把三段的贡献加起来', [
-          `${worldAxis} = ${terms.join(' + ')} ≈ ${number(rawWS[axis], 3)}`
-        ], `这三次乘完再相加，就是 dot 的运算。图上青箭头从 P 沿世界 ${worldAxis} 走这段距离，和粉箭头尖通过青虚线对齐。切换另一个世界轴，就用相应的那一行重算。`]
+        [`这一行的 dot 读世界 ${worldAxis}`, [
+          `i.TtoW${axis}.xyz = (T.${field}, B.${field}, N.${field}) ≈ ${tuple(row, 5)}`,
+          `右侧的旧 bump ≈ ${tuple(ts, 5)}`
+        ], `上一页把世界 +${worldAxis} 单位箭头平移到 P，再沿 T、B、N 量它，得到的正是这一行。用相同的 T、B、N 坐标对旧 bump 和这根单位箭头做点积，就能读出粉箭头沿世界 +${worldAxis} 走多远。图上是从 P 的零刻度到 Q 的落点那段青箭头。`, [92], {line:92, text:excerpt}],
+        [`先在世界 ${worldAxis} 尺上给每段找起点和终点`, legs.map(({from, to}, index) =>
+          `${'TBN'[index]} 段　${index === 0 ? 'P' : ends[index - 1]} → ${ends[index]}　刻度 ${tick(from[axis])} → ${tick(to[axis])}`
+        ), '把穿过 P 的世界轴当尺子，令 P 的刻度为 0。蓝段终点是 P1，黄段终点是 P2，绿段终点是 Q。顺着每条彩色虚线找它的投影。尺上每一段从上一段的终点接着走。'],
+        [`加完三段，验算世界 ${worldAxis} 的读数`, [
+          ...terms.map((term, index) =>
+            `${'TBN'[index]} 段　${'TBN'[index]}.${field} × bump.${'xyz'[index]} = ${term} ≈ ${number(contributions[index], 5)}`),
+          `${worldAxis} = ${terms.join(' + ')} ≈ ${number(rawWS[axis], 5)}`,
+          `half3(世界 X, 世界 Y, 世界 Z) ≈ ${tuple(rawWS, 5)}`
+        ], `沿 T 走一格在世界 ${worldAxis} 上会移动 T.${field}，走 bump.x 格就乘 bump.x。B、N 两段同样计算。把刻度尺上的三段加起来，就得到这一行的输出。照此读 X、Y、Z，half3 收齐三个世界分量。`]
       ], [
         ['点积读前三格', `i.TtoW${axis}.xyz ≈ ${vecText(row)}`,
-          '前三格与旧 bump 的三项一一配对。第四格 .w 装的是位置，在「读回 worldPos」中会用到。']
+          '旧 bump 表示位移 PQ。给方向补 0 时，第四列 P 乘 0。第 92 行直接用 .xyz 取三格，第 78 行另取三行的 .w 拼回 P 的世界位置。']
       ]);
     } else if (step === 'normal-result') {
       const localReading = focus.reading === 0;
@@ -892,6 +1265,9 @@
       ]);
     } else if (step === 'refraction') {
       const movement = !tilt || !distortion ? 'B 与 A 重合' : `B 在 A 的${tilt > 0 ? '右上' : '左下'}方`;
+      byId('try').textContent = distortion === 0
+        ? `当前强度为 0，bump.xy ${xy} × 0 = (0, 0)，图上 B 与 A 重合。把强度调到 40，再切换倾角观察 B。`
+        : steps.refraction.try;
       lesson([
         ['先在照片上标出 P 的原位 A', `P 的屏幕位置 ${tuple(pixel)} 像素 → A 的 UV ${tuple(originUV, 3)}`,
           '这幅背景示意固定 P 的屏幕位置。片元的 i.pos.xy 是像素坐标，用 152 除以画面宽 320、96 除以高 200，得到背景 UV。稍后读世界位置时，会从 TtoW 的 .w 取数。', [85]],
@@ -908,20 +1284,14 @@
       ], `A ${tuple(pixel)}　→　B ${sample}。${movement}，P 的背景色取自${wall.name}。`, refrCol);
     } else if (step === 'reflection') {
       pictureValues([
-        ['灰点 O', '(0, 0, 0)'],
-        ['白点 P · frag 的 worldPos', vecText(worldPos)],
-        [`青色 ${worldAxis} 段`, number(worldPos[axis], 3), 'sample']
+        ['白点 P · worldPos', vecText(worldPos)]
       ]);
       lesson([
-        ['先从整座场景的原点找到白点 P', worldPos.map((value, index) => {
-          const endpoint = worldPos.map((component, componentIndex) => componentIndex <= index ? component : 0);
-          return `沿世界 ${'XYZ'[index]} 走 ${number(value, 3)} 格 → ${vecText(endpoint)}`;
-        }), '从灰点 O 开始，按 X、Y、Z 三段走。每段只沿一根世界轴。走完三段，来到三角形里的白点 P。'],
-        ['这三个读数叫片元的 worldPos', `P 的 worldPos ≈ ${vecText(worldPos)}`,
-          '这句在给白点 P 着色时执行，返回的是 P 在场景里的三个世界坐标。接下来的几个小步从蓝色顶点开始，追到这句读取的三个 .w。', [78], {line:78, text:'worldPos'}]
+        ['从三个 .w 读出 P 的世界坐标', `X、Y、Z 分别读到 ${vecText(worldPos)}`,
+          '运行到 frag 时，i 已经是给 P 的数据。第 78 行从三个字段各取最后一格，按 X、Y、Z 排成 worldPos。图上从世界原点 O 沿这三段走，就到白点 P。', [78]]
       ], [
-        ['蓝点和白点', 'Q0、Q1、Q2 是三个角。P 在三角形里面。',
-          'vert 逐个处理蓝色顶点。frag 在 GPU 给三角形内部生成的片元上运行，这里选白点 P 来看。']
+        ['从网格顶点到玻璃点 P', '算顶点的世界坐标 → 写入 .w → 插值得到 P 的坐标',
+          'vert 先给三角形的三个顶点各存一份坐标。GPU 按 P 在三角形内的位置对三份数据插值，frag 收到的 i 就带着 P 的坐标。']
       ]);
     } else if (step === 'vertex-pos') {
       const vertex = GlassLab.verticesOS[0];
@@ -982,10 +1352,10 @@
           `Q0 的 .w ≈ ${values[0]}　Q1 的 .w ≈ ${values[1]}　Q2 的 .w ≈ ${values[2]}`
         ], `GPU 会为三角形里面的每个片元准备 i。这里只跟踪 ${channel} 这一个格子，三个角各有一个值，对应世界 ${worldAxis}。`, [59,75,77], {line:77, text:'v2f i'}],
         ['先到 Q0 和 Q1 的中间，再朝 Q2 走三分之一', [
-          `边中点 H 的 ${worldAxis} ≈ (${values[0]} + ${values[1]}) / 2 ≈ ${number(midpoint, 3)}`,
-          `从 H 到 Q2 的 ${worldAxis} 差 ≈ ${values[2]} − (${number(midpoint, 3)}) ≈ ${number(delta, 3)}`,
+          `边中点 M 的 ${worldAxis} ≈ (${values[0]} + ${values[1]}) / 2 ≈ ${number(midpoint, 3)}`,
+          `从 M 到 Q2 的 ${worldAxis} 差 ≈ ${values[2]} − (${number(midpoint, 3)}) ≈ ${number(delta, 3)}`,
           `P 的 ${worldAxis} ≈ ${number(midpoint, 3)} + (${number(delta, 3)}) / 3 ≈ ${number(worldPos[axis], 3)}`
-        ], '到边中点 H 先取两端值的平均。图中的 P 位于从 H 到 Q2 这条线的前 1/3 处，所以选中的格子也从 H 的数值朝 Q2 的数值走 1/3。这就是本例的插值。'],
+        ], '到边中点 M 先取两端值的平均。图中的 P 位于从 M 到 Q2 这条线的前 1/3 处，所以选中的格子也从 M 的数值朝 Q2 的数值走 1/3。这就是本例的插值。'],
         ['把这两次分段合在一起', [
           `i.${channel} ≈ (${values.join(' + ')}) / 3 ≈ ${number(worldPos[axis], 3)}`
         ], '先平均 Q0、Q1，再保留这个中点的 2/3，加上 Q2 的 1/3，恰好让三个顶点各占 1/3。本例选的就是这个点。GPU 按同样的权重逐格插值，得到 P 的三份 float4。']
@@ -1013,56 +1383,39 @@
           '第 78 行的位置用来求三维的视线。第 85 行从投影到的像素位置计算背景取样的 UV。']
       ]);
     } else if (step === 'view') {
-      pictureValues([
-        ['白点 P · worldPos', vecText(worldPos)],
-        ['相机 C · _WorldSpaceCameraPos', vecText(camera)],
-        ['P 到 C 的位移', vecText(viewDelta), 'sample']
-      ]);
-      lesson([
-        ['从世界原点量到了两组位置', [
-          `起点 P = ${vecText(worldPos)}`,
-          `终点 C = ${vecText(camera)}`
-        ], '白点 P 位于玻璃面。Unity 的 _WorldSpaceCameraPos 给出渲染相机的世界位置，图中标为 C。P 和 C 都用场景固定的 X、Y、Z 量。'],
-        ['从 P 起步，每根世界轴还差多少', viewDelta.map((value, index) =>
-          `${'XYZ'[index]} 还差 ${number(camera[index], 3)} − (${number(worldPos[index], 3)}) ≈ ${number(value, 3)}`
-        ), '要找的是从 P 走到 C 的距离和方向。每根轴都用终点的坐标减起点的坐标。负号表示沿那根轴的反方向走。看青线的箭头和带正负号的标注。', [79], {line:79, text:'_WorldSpaceCameraPos.xyz - worldPos'}],
-        ['沿三段去验证箭头的终点', [
-          `C − P ≈ ${vecText(viewDelta)}`,
-          `P ${vecText(worldPos)} + ${vecText(viewDelta)} ≈ C ${vecText(camera)}`
-        ], '从 P 沿三根世界轴走完这三个数，能到 C。图中白箭头把 P 和 C 直接连起来，它的方向和这三段合起来一样。下一步在这根线上取长度 1。']
-      ], [
-        ['本例的世界 Y', `C.y − P.y ≈ ${number(viewDelta[1], 3)}`,
-          '两个点同高，所以沿世界 Y 的位移是 0。图上只画 X、Z 两段。']
-      ]);
-    } else if (step === 'view-unit') {
+      const subtraction = viewDelta.map((_, index) => `${number(camera[index], 3)} − (${number(worldPos[index], 3)})`);
       const squares = viewDelta.map(value => `(${number(value, 3)})²`);
       pictureValues([
-        ['白虚线 · 完整位移 C − P', vecText(viewDelta)],
-        ['紫箭头 · worldViewDir', vecText(viewDir), 'view'],
-        ['紫箭头长度', '1', 'view']
+        ['白点 P', vecText(worldPos)],
+        ['相机 C', vecText(camera)],
+        ['紫箭头 · worldViewDir', vecText(viewDir), 'view']
       ]);
       lesson([
-        ['先量白虚线有多长', [
-          `C − P ≈ ${vecText(viewDelta)}`,
-          `长度 = √(${squares.join(' + ')}) ≈ ${number(viewLength, 3)}`
-        ], '白虚线从 P 连到 C。把它沿三根世界轴的三个分量分别平方后相加，再开平方，得到这段完整距离。'],
-        ['三个分量一起除以完整距离', [
-          `${vecText(viewDelta)} / ${number(viewLength, 3)} ≈ ${vecText(viewDir)}`,
-          `worldViewDir ≈ ${vecText(viewDir)}`
-        ], 'normalize 把三根轴上走的距离缩成同一比例，所以箭头仍从 P 朝 C，长度变成 1。图中的紫箭头就是这个结果。下一步算倒影时，代码会把这支箭头反向，得到朝玻璃走的入射方向。', [79], {line:79, text:'normalize(_WorldSpaceCameraPos.xyz - worldPos)'}]
+        ['终点 C 减起点 P，得到白虚线', `C − P = ${vecText(camera)} − ${vecText(worldPos)} = ${vecText(viewDelta)}`,
+          '相减得到从 P 出发、还要沿世界 X、Y、Z 各走多少才能到 C。', [79], {line:79, text:'_WorldSpaceCameraPos.xyz - worldPos'}],
+        ['沿白虚线走 1 格，得到紫箭头', `${vecText(viewDelta)} ÷ ${number(viewLength, 3)} ≈ ${vecText(viewDir)}`,
+          'normalize 把三个分量都除以白虚线的长度，得到从 P 指向 C 的单位向量 worldViewDir。']
       ], [
-        ['透视与正交', 'GetWorldSpaceNormalizeViewDir(positionWS)',
-          '这段 Shader 按透视相机的几何关系计算。正交相机的视线互相平行，URP 的 helper 在正交分支返回相机前向的反方向。']
+        ['沿三个世界轴分别相减', `(${subtraction.join(', ')}) = ${vecText(viewDelta)}`,
+          '每个分量都用相机坐标减去 P 的坐标。'],
+        ['白虚线的长度', `√(${squares.join(' + ')}) ≈ ${number(viewLength, 3)}`,
+          '把三个分量的平方相加再开根号，得到从 P 到 C 的距离。']
       ]);
     } else if (step === 'bounce') {
+      pictureValues([
+        ['橙箭头 · reflDir', vecText(reflected), 'ray'],
+        ['取色位置', windowName, 'ray']
+      ]);
       lesson([
-        ['把 V 反过来送进 reflect', [`V ≈ ${vecText(viewDir)}　→　I = −V ≈ ${vecText(incident)}`, `nWS ≈ ${vecText(ws)}`],
-          'V 从 P 指向相机，reflect 的第一个参数沿入射方向撞向玻璃。取负号后得到图里的白箭头 I。第二个参数 bump 在第 92 行已换为世界方向，图上是粉箭头。', [93]],
-        ['只翻转垂直镜面的分量', [`dot(I, nWS) ≈ ${number(alongNormal, 3)}`, `R = I − 2·dot(I, nWS)·nWS ≈ ${vecText(reflected)}`],
-          'dot(I, nWS)·nWS 是 I 沿法线的那一部分。减掉两倍，会把这一部分从正变负或从负变正，沿镜面方向的部分保持原值。图中橙箭头 R 从 P 指向环境。'],
-        ['用 R 选环境颜色，再乘主贴图颜色', [`${windowName} → reflCol ≈ ${vecText(reflCol)}`],
-          'texCUBE 沿 R 读环境贴图。本图用 R 中绝对值最大的分量选面，再用它的正负号区分轴的两侧。tex2D 用 i.uv.xy 读主贴图，rgb 逐通道乘倒影颜色。', [94,97]]
+        ['反转视线，用粉色法线算反射方向', `−worldViewDir ≈ ${vecText(incident)}`,
+          '上一页的视线从 P 指向相机。加负号得到朝 P 的白箭头，与粉色法线 bump 一起交给 reflect，输出橙箭头 reflDir。', [93], {line:93, text:'-worldViewDir'}],
+        ['沿橙箭头读 Cubemap 的颜色', `${windowName} → reflCol`,
+          '橙箭头指向的彩色小面代表本次取色的方向。texCUBE 沿这个方向读环境色，再乘主贴图的颜色。', [97]]
       ], [
+        ['reflect 怎样得到出射方向', `R = I − 2 × (I · nWS) × nWS ≈ ${vecText(reflected)}`,
+          `I 是白色入射方向，nWS 是粉色世界法线。用点积 I · nWS ≈ ${number(alongNormal, 3)} 找到 I 沿法线的分量，再减去这部分的两倍，就把垂直玻璃小面的分量翻转。`],
+        ['示意图怎么选 Cubemap 的面', windowName,
+          '取反射向量中绝对值最大的分量来确定轴，再根据分量符号选择轴的正侧或负侧。'],
         ['reflCol · 线性 RGB', vecText(reflCol), `本面环境色 ${tuple(faces[face].rgb)} 分通道乘主贴图示例色 (0.88, 0.92, 1)。`]
       ], `P 的倒影来自${windowName}。`, reflCol);
     } else {
@@ -1129,7 +1482,8 @@
   }
   function readStep() {
     const requested = location.hash.slice(1);
-    return stepOrder.includes(requested) ? requested : 'basis';
+    if (requested === 'view-unit') return 'view';
+    return stepOrder.includes(requested) || positionDetailSteps.includes(requested) ? requested : 'basis';
   }
   window.addEventListener('hashchange', () => { if (readStep() !== step) setStep(readStep()); });
   document.querySelectorAll('[data-step]').forEach(button => button.addEventListener('click',()=>navigate(button.dataset.step)));
@@ -1151,17 +1505,27 @@
     }));
   }
   for (const input of Object.values(inputs)) input.addEventListener('input',refresh);
+  byId('projection-example').addEventListener('click', () => {
+    inputs.turn.value = '-45';
+    inputs.tilt.value = '30';
+    chooseFocus('axis', 0);
+  });
   byId('flat-view').addEventListener('click', () => { wantsSpace = viewChoice = false; paintView(); });
   byId('space-view').addEventListener('click', () => {
     if (spaceStatus === 'failed') spaceStatus = 'idle';
     wantsSpace = viewChoice = true;
     paintView();
   });
-  function moveStep(delta) {
-    navigate(stepOrder[(stepOrder.indexOf(step) + delta + stepOrder.length) % stepOrder.length]);
+  function goToLesson(next) {
+    navigate(next);
     byId('lesson-title').focus({preventScroll:true});
     document.querySelector('.flow').scrollIntoView({block:'start'});
   }
+  function moveStep(delta) {
+    const order = activeStepOrder();
+    goToLesson(order[(order.indexOf(step) + delta + order.length) % order.length]);
+  }
+  byId('position-detail').querySelector('button').addEventListener('click', () => goToLesson(positionDetailSteps[0]));
   byId('previous').addEventListener('click', () => moveStep(-1));
   byId('next').addEventListener('click', () => moveStep(1));
   byId('reset-view').addEventListener('click',()=>resetView());
@@ -1191,8 +1555,7 @@
     const vec = (x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
     const point=vec(...GlassLab.pivot), up=vec(0,1,0);
     const deg=Math.PI/180;
-    const photoWidth=4.3, photoHeight=photoWidth*GlassLab.size[1]/GlassLab.size[0], photoZ=-1.63, cubeRadius=2.15;
-    const photoPoint=uv=>point.clone().add(vec((uv[0]-originUV[0])*photoWidth,(uv[1]-originUV[1])*photoHeight,photoZ));
+    const photoWidth=4.3, photoHeight=photoWidth*GlassLab.size[1]/GlassLab.size[0], photoDistance=1.7, cubeRadius=2.15;
     const rgbColor = rgb => new THREE.Color(...rgb);
     const colorStyle=color=>color.getStyle();
 
@@ -1276,19 +1639,31 @@
       for (const marker of markers) dot(vec(...marker.at), palette[marker.color], .043);
       for (const tag of labels) label(tag.text, vec(...tag.at), palette[tag.color], tag.dx, tag.dy);
     }
-    function background(data) {
+    function background(data, showCamera) {
+      const towardCamera = vec(...data.viewDir);
+      const facing = new THREE.Quaternion().setFromUnitVectors(vec(0,0,1),towardCamera);
+      const original = point.clone().addScaledVector(towardCamera,-photoDistance);
+      const photoPoint = ([horizontal,vertical]) => vec(
+        (horizontal-originUV[0])*photoWidth,(vertical-originUV[1])*photoHeight,0
+      ).applyQuaternion(facing).add(original);
       const split = GlassLab.seam / GlassLab.size[0];
       for(const [left,right,wall] of [[0,split,GlassLab.brick],[split,1,GlassLab.blue]]) {
         mesh(new THREE.PlaneGeometry((right-left)*photoWidth,photoHeight),rgbColor(wall.rgb),
-          photoPoint([(left+right)/2,.5]),{side:THREE.DoubleSide});
+          photoPoint([(left+right)/2,.5]),{side:THREE.DoubleSide}).quaternion.copy(facing);
       }
       const corners=[[0,0],[1,0],[1,1],[0,1],[0,0]].map(photoPoint);
       line(corners,palette.sample,.65);
-      label('背景快照',corners[3],palette.sample,3,-21,true);
-      const from=photoPoint(originUV),to=photoPoint(data.uv);
-      from.z+=.035;
-      to.z+=.035;
-      line([from,point],palette.muted,.9,true);
+      label('相机画面 · UV',corners[3],palette.sample,3,-21,true);
+      const from=original.clone().addScaledVector(towardCamera,.035);
+      const to=photoPoint(data.uv).addScaledVector(towardCamera,.035);
+      if (showCamera) {
+        const camera = vec(...data.camera);
+        line([camera,point,from],palette.view,.88,true);
+        dot(camera,palette.view);
+        label('C · 相机',camera,palette.view,8,-19);
+      } else {
+        line([point,from],palette.muted,.9,true);
+      }
       if(from.distanceTo(to)<.035) {
         dot(from,palette.sample);
         label(from.distanceTo(to)<.000001?'A = B':'A ≈ B',from,palette.sample,8,-14);
@@ -1300,23 +1675,18 @@
         label('B',to,palette.sample,9,-19);
       }
     }
-    function bounce(data,showDetails) {
+    function bounce(data,showVectors) {
       const {axis,face,reflected}=data;
       const hit=point.clone().addScaledVector(vec(...reflected),cubeRadius/Math.abs(reflected[axis]));
       const tile=mesh(new THREE.PlaneGeometry(.74,.74),rgbColor(faces[face].rgb),hit,{side:THREE.DoubleSide,opacity:.72,transparent:true,depthWrite:false});
       if(axis===0) tile.rotation.y=Math.PI/2;
       if(axis===1) tile.rotation.x=Math.PI/2;
-      if(showDetails) {
-        const shell=new THREE.BoxGeometry(cubeRadius*2,cubeRadius*2,cubeRadius*2);
-        const edges=new THREE.LineSegments(new THREE.EdgesGeometry(shell),new THREE.LineBasicMaterial({color:palette.muted,transparent:true,opacity:.18}));
-        edges.position.copy(point);
-        shell.dispose();
-        group.add(edges);
+      if(showVectors) {
         drawCoordinates('bounce', data);
-        direction(vec(...data.ws),1,'nWS',palette.mapped,8,-19,.032);
+        direction(vec(...data.ws),1,'bump',palette.mapped,8,-19,.032);
       }
       arrow(point,hit,palette.ray,.030);
-      label('R → '+face,hit,palette.ray,8,-20);
+      label(`${showVectors ? 'reflDir' : 'R'} → ${face}`,hit,palette.ray,8,-20);
     }
     function render() {
       if(viewport.hidden) return;
@@ -1352,13 +1722,27 @@
     }
     resetView = () => {
       const anchor = vec(...GlassLab.pivot);
-      if(['view','view-unit','bounce'].includes(step)) {
+      if(step==='view') {
         orbit.target.copy(anchor).add(vec(-1.32,.1,1.35));
-        const offset = step === 'view' ? vec(8.4,4.6,7.3) : vec(4.8,4.1,9.3);
-        viewCamera.position.copy(anchor).add(offset);
-      } else if (step==='refraction' || step==='mix') {
-        orbit.target.copy(anchor).add(vec(.05,0,-.48));
-        viewCamera.position.copy(anchor).add(vec(3.6,1.65,5.45));
+        viewCamera.position.copy(anchor).add(vec(8.4,4.6,7.3));
+      } else if (step==='bounce') {
+        orbit.target.copy(anchor).add(vec(-.32,.2,.1));
+        viewCamera.position.copy(orbit.target).add(vec(4.3,2.6,6.1));
+      } else if (step==='refraction') {
+        const sightAxis = vec(...data.viewDir);
+        const photoRight = up.clone().cross(sightAxis);
+        const sightLength = data.viewLength + photoDistance;
+        orbit.target.copy(anchor).addScaledVector(sightAxis,(data.viewLength-photoDistance)*.5);
+        viewCamera.position.copy(orbit.target)
+          .addScaledVector(sightAxis,sightLength*.84)
+          .addScaledVector(photoRight,-sightLength*.82)
+          .addScaledVector(up,sightLength*.55);
+      } else if (step==='mix') {
+        orbit.target.copy(anchor).addScaledVector(vec(...data.viewDir),-.48);
+        viewCamera.position.copy(anchor).add(vec(-5.2,2.4,3.75));
+      } else if (step==='dot') {
+        orbit.target.copy(anchor).add(vec(-.12,.08,.12));
+        viewCamera.position.copy(anchor).add(vec(-1.42,1.46,4.53));
       } else {
         orbit.target.copy(anchor).add(vec(-.24,-.24,-.14));
         viewCamera.position.copy(anchor).add(vec(-3.38,1.92,3.38));
@@ -1373,7 +1757,7 @@
       if(step==='basis') normalFacet(data);
       if(step==='basis' || coordinateSteps.includes(step)) drawCoordinates(step, data);
       if(step==='refraction' || step==='mix') {
-        background(data);
+        background(data,step==='refraction');
         dot(point,rgbColor(step==='mix'?data.finalCol:data.refrCol),.115);
         label('P',point,palette.mapped,-19,9);
       }

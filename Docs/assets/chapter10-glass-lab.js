@@ -6,8 +6,9 @@ const GlassLab = (() => {
   const pivot = [1, 1, 1];
   const verticesOS = [[-1, -.4, 0], [1, -.4, 0], [0, .8, 0]];
   const worldAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-  const positionSteps = ['reflection', 'vertex-pos', 'pack-pos', 'interp-pos', 'read-pos'];
-  const coordinateSteps = ['frame', 'decode', 'matrix', 'rows', 'dot', 'normal-result', ...positionSteps, 'view', 'view-unit'];
+  const positionSteps = ['vertex-pos', 'pack-pos', 'interp-pos', 'read-pos'];
+  const transformSteps = ['world-to-tangent', 'tangent-to-world'];
+  const coordinateSteps = ['frame', 'decode', ...transformSteps, 'matrix', 'combine', 'rows', 'dot', 'normal-result', 'reflection', ...positionSteps, 'view'];
   const seam = 160;
   const brick = { name: '砖红墙', rgb: [.46, .112, .064] };
   const blue = { name: '蓝墙', rgb: [.047, .226, .37] };
@@ -37,7 +38,9 @@ const GlassLab = (() => {
     const lean = Math.sin(radians(tilt));
     const packedNormal = [.5 + .4 * lean, .5 + .3 * lean, 0, 1];
     const planarNormal = [2 * packedNormal[0] * packedNormal[3] - 1, 2 * packedNormal[1] - 1];
-    const outward = Math.max(1e-16, Math.sqrt(1 - Math.min(1, dot(planarNormal, planarNormal))));
+    const planarLengthSquared = dot(planarNormal, planarNormal);
+    const planarLength = Math.sqrt(planarLengthSquared);
+    const outward = Math.max(1e-16, Math.sqrt(1 - Math.min(1, planarLengthSquared)));
     const ts = [...planarNormal, outward];
     const spin = radians(turn);
     const tangent = [Math.cos(spin), 0, -Math.sin(spin)];
@@ -50,6 +53,7 @@ const GlassLab = (() => {
       vertexSlots.reduce((sum, vertex) => sum + vertex[axis][slot], 0) / 3));
     const rows = fragmentSlots.map(row => row.slice(0, 3));
     const worldPos = fragmentSlots.map(row => row[3]);
+    const worldToTangent = [tangent, bitangent, normal].map(direction => [...direction, -dot(direction, worldPos)]);
     const rawWS = rows.map(row => dot(row, ts));
     const ws = unit(rawWS);
     const camera = [cameraX, 1, 5];
@@ -68,25 +72,37 @@ const GlassLab = (() => {
     const wall = samplePx[0] < seam ? brick : blue;
     const reflCol = faces[face].rgb.map((channel, index) => channel * tint[index]);
     const finalCol = reflCol.map((channel, index) => channel * (1 - amount) + wall.rgb[index] * amount);
-    return { tilt, turn, distortion, amount, lean, packedNormal, ts, tangent, bitangent, normal,
-      rows, rawWS, ws, verticesWS, vertexSlots, fragmentSlots,
+    return { tilt, turn, distortion, amount, lean, packedNormal, ts, planarLengthSquared, planarLength,
+      tangent, bitangent, normal,
+      rows, rawWS, ws, verticesWS, vertexSlots, fragmentSlots, worldToTangent,
       worldPos, camera, viewDelta, viewLength, viewDir, incident, alongNormal, reflected, axis, face,
       offsetPx, offsetUV, samplePx, uv, wall, refrCol: wall.rgb, reflCol, finalCol };
   }
 
+  function normalLegs(data) {
+    let from = data.worldPos;
+    return [data.tangent, data.bitangent, data.normal].map((direction, index) => {
+      const weight = data.ts[index];
+      const delta = direction.map(value => value * weight);
+      const to = addScaled(from, delta);
+      const leg = {from, to, delta, weight};
+      from = to;
+      return leg;
+    });
+  }
+
   function coordinateSketch(step, data, focus) {
     const origin = [0, 0, 0];
-    const {worldPos: point, camera, tangent, bitangent, normal, rawWS, viewDelta, viewDir, incident, verticesWS} = data;
-    const {axis, column, reading} = focus;
+    const {worldPos: point, camera, tangent, bitangent, normal, rawWS, viewDir, verticesWS} = data;
+    const {axis, localAxis, column, reading} = focus;
     const localAxes = [[tangent, 'T', 't'], [bitangent, 'B', 'b'], [normal, 'N', 'n']];
     const onPosition = positionSteps.includes(step);
-    const onView = ['view', 'view-unit', 'bounce'].includes(step);
     const strokes = [], labels = [], markers = [];
     const label = (text, at, color = 'ink', dx = 7, dy = -18) => labels.push({text, at, color, dx, dy});
     const line = (points, color, dashed = false) => strokes.push({points, color, dashed});
     const arrow = (from, to, color, width) => strokes.push({points:[from, to], color, arrow:true, width});
     const mark = (at, color = 'ink') => markers.push({at, color});
-    const pointName = onPosition || onView ? 'P · worldPos' : 'P';
+    const pointName = onPosition || step === 'reflection' ? 'P · worldPos' : 'P';
 
     function axesAt(center, selected = -1) {
       worldAxes.forEach((direction, index) => {
@@ -116,24 +132,21 @@ const GlassLab = (() => {
       });
     }
 
-    function composeNormal(showWeights) {
-      let tail = point;
-      localAxes.forEach(([direction, name, color], index) => {
-        const weight = data.ts[index];
-        const end = addScaled(tail, direction, weight);
-        if (Math.abs(weight) > .025) {
-          arrow(tail, end, color, .018);
-          if (showWeights) label(`${number(weight, 3)} ${name}`, addScaled(tail, direction, weight * .56), color, 7, 9);
-        }
-        tail = end;
+    function composeNormal(showWeights, count = 3) {
+      const visibleLegs = normalLegs(data).slice(0, count);
+      visibleLegs.forEach(({from, to, delta, weight}, index) => {
+        const [, name, color] = localAxes[index];
+        if (Math.abs(weight) <= .025) return;
+        arrow(from, to, color, .018);
+        if (showWeights) label(`${number(weight, 3)} ${name}`, addScaled(from, delta, .56), color, 7, 9);
       });
+      return visibleLegs.at(-1).to;
     }
 
-    if (!['basis', 'decode', 'view-unit', 'bounce'].includes(step)) {
-      if (step !== 'view') axesAt(origin, ['reflection', 'pack-pos', 'read-pos', 'rows', 'dot'].includes(step) ? axis : -1);
+    if (!['basis', 'decode', 'combine', 'dot', 'view', 'bounce'].includes(step)) {
+      if (step !== 'reflection') axesAt(origin, ['pack-pos', 'read-pos', 'rows'].includes(step) ? axis : -1);
       mark(origin, 'muted');
-      if (step === 'view') label('O · 世界原点', origin, 'muted', -18, 19);
-      else label('O', origin, 'muted', -20, 7);
+      label('O', origin, 'muted', -20, 7);
     }
 
     if (step === 'basis') {
@@ -145,6 +158,8 @@ const GlassLab = (() => {
       }
       arrow(point, mappedTip, 'mapped', .029);
       label(data.tilt ? 'bump' : 'bump = N', mappedTip, 'mapped');
+    } else if (step === 'reflection') {
+      worldRoute(origin, point, 'sample');
     } else if (onPosition) {
       line([...verticesWS, verticesWS[0]], 't');
       verticesWS.forEach((vertex, index) => {
@@ -153,7 +168,7 @@ const GlassLab = (() => {
         mark(vertex, color);
         label(selected ? 'Q0 · vert' : 'Q' + index, vertex, color, 7, 6);
       });
-      if (step === 'reflection' || step === 'read-pos') {
+      if (step === 'read-pos') {
         worldRoute(origin, point, 'sample', axis);
       } else if (step === 'pack-pos') {
         worldRoute(origin, verticesWS[0], 'sample', axis);
@@ -172,24 +187,38 @@ const GlassLab = (() => {
         arrow(midpoint, point, 'sample', .024);
         label('全段 1/3', addScaled(midpoint, bitangent, .18), 'sample', -44, -10);
       }
-    } else if (onView) {
+    } else if (step === 'view') {
       line([point, camera], 'ink', true);
       mark(camera);
       label('C · 相机', camera, 'ink', -18, -36);
-      if (step === 'view') {
-        worldRoute(point, viewDelta, 'sample');
-        arrow(point, camera, 'ink', .020);
-        label('C − P', addScaled(point, viewDelta, .55), 'ink', 7, -22);
-      } else {
-        const towardsCamera = addScaled(point, viewDir);
-        arrow(point, towardsCamera, 'view', .032);
-        label(step === 'bounce' ? 'V' : 'worldViewDir · 长 1', towardsCamera, 'view', 6, -23);
-        if (step === 'bounce') {
-          const towardsGlass = addScaled(camera, incident);
-          arrow(camera, towardsGlass, 'ink', .029);
-          label('−V', towardsGlass, 'ink', 6, 9);
-        } else {
-          label(`C − P · 长 ${number(data.viewLength, 3)}`, addScaled(point, viewDelta, .54), 'ink', 5, 9);
+      const towardsCamera = addScaled(point, viewDir);
+      arrow(point, towardsCamera, 'view', .032);
+      label('worldViewDir', towardsCamera, 'view', 6, -23);
+    } else if (step === 'bounce') {
+      const from = addScaled(point, viewDir, 1.55);
+      arrow(from, point, 'ink', .022);
+      label('入射', from, 'ink', 6, -20);
+    } else if (transformSteps.includes(step)) {
+      arrow(origin, point, 'sample', .018);
+      label('OP', addScaled(origin, point, .5), 'sample', -28, -14);
+      localAxes.forEach(([direction, name, color], index) => {
+        const end = addScaled(point, direction, .78);
+        arrow(point, end, color, step === 'world-to-tangent' && index === localAxis ? .026 : .015);
+        label(name, end, color);
+      });
+      if (step === 'world-to-tangent') {
+        const [direction, name, color] = localAxes[localAxis];
+        const reading = -data.worldToTangent[localAxis][3];
+        const foot = addScaled(origin, direction, reading);
+        const start = addScaled(origin, direction, Math.min(0, reading) - .18);
+        const end = addScaled(origin, direction, Math.max(.82, reading + .3));
+        arrow(start, end, color, .01);
+        label(`+${name}`, end, color, 7, -12);
+        line([point, foot], color, true);
+        if (Math.abs(reading) > .001) {
+          arrow(origin, foot, color, .024);
+          mark(foot, color);
+          label(`${name}·P = ${number(reading, 3)}`, foot, color, 8, 13);
         }
       }
     } else if (step === 'matrix') {
@@ -198,6 +227,7 @@ const GlassLab = (() => {
         const end = addScaled(point, ruler);
         if (index !== column) {
           line([point, end], axisColor, true);
+          mark(end, axisColor);
           label(axisName, end, axisColor);
         }
       });
@@ -206,6 +236,41 @@ const GlassLab = (() => {
       arrow(point, tip, color, .028);
       mark(tip, color);
       label(`${name} · 走 1 格`, tip, color, 8, -23);
+    } else if (step === 'combine') {
+      const count = focus.legs + 1;
+      const tip = composeNormal(true, count);
+      if (count > 1) arrow(point, tip, count === 3 ? 'mapped' : 'sample', .027);
+      mark(tip, count === 3 ? 'mapped' : localAxes[count - 1][2]);
+      if (tip.some((value, index) => Math.abs(value - point[index]) > .025)) {
+        label(count === 3 ? 'Q · 法线箭头尖' : `P${count}`, tip, count === 3 ? 'mapped' : 'ink', 9, -21);
+      }
+    } else if (step === 'dot') {
+      const direction = worldAxes[axis];
+      const project = position => addScaled(point, direction, position[axis] - point[axis]);
+      const railEnd = addScaled(point, direction, 1.14);
+      const legs = normalLegs(data);
+      const tip = legs.at(-1).to;
+      const projectedTip = project(tip);
+      arrow(addScaled(point, direction, -1.14), railEnd, 'muted', .01);
+      label(`世界 +${'XYZ'[axis]}`, railEnd, 'muted', 5, -18);
+
+      legs.forEach(({from, to, weight}, index) => {
+        const [, , color] = localAxes[index];
+        const foot = project(to);
+        if (Math.abs(weight) > .025) {
+          arrow(from, to, color, .022);
+          if (index < 2) {
+            mark(to, color);
+            label(`P${index + 1}`, to, color, 7, index === 0 ? 9 : -22);
+          }
+        }
+        line([to, foot], color, true);
+        mark(foot, color);
+      });
+      arrow(point, tip, 'mapped', .028);
+      label('Q · 粉箭头尖', tip, 'mapped', 8, -22);
+      arrow(point, projectedTip, 'sample', .022);
+      label(`${'XYZ'[axis]} = ${number(rawWS[axis], 5)}`, projectedTip, 'sample', 6, 11);
     } else if (step === 'normal-result') {
       const tip = addScaled(point, data.ws);
       if (reading === 0) composeNormal(true);
@@ -218,7 +283,8 @@ const GlassLab = (() => {
         const direction = worldAxes[axis];
         const end = addScaled(point, direction, 1.16);
         line([addScaled(point, direction, -1.16), end], 'sample', true);
-        label(`平行于 ${'XYZ'[axis]}`, end, 'sample', 7, 10);
+        arrow(point, addScaled(point, direction), 'sample', .015);
+        label(`e_${'XYZ'[axis]} · 世界单位轴`, end, 'sample', 7, 12);
       }
       localAxes.forEach(([direction, name, color], index) => {
         const end = addScaled(point, direction);
@@ -233,22 +299,22 @@ const GlassLab = (() => {
         }
       });
 
-      if (step === 'decode' || step === 'dot') {
-        composeNormal(step === 'decode');
+      if (step === 'decode') {
+        composeNormal(true);
         const tip = addScaled(point, rawWS);
-        arrow(point, tip, 'mapped', .028);
-        label(step === 'decode' ? 'bump' : 'nWS', tip, 'mapped', 7, -22);
-
-        if (step === 'dot') {
-          const projected = addScaled(point, worldAxes[axis], rawWS[axis]);
-          line([tip, projected], 'sample', true);
-          arrow(point, projected, 'sample', .024);
-          label(`${'XYZ'[axis]} = ${number(rawWS[axis], 3)}`, projected, 'sample', 5, 9);
+        if (data.planarLength > .025) {
+          const foot = addScaled(addScaled(point, tangent, data.ts[0]), bitangent, data.ts[1]);
+          mark(foot, 'sample');
+          label('H', foot, 'sample', 9, 10);
         }
+        arrow(point, tip, 'mapped', .028);
+        label('bump · Q', tip, 'mapped', 7, -22);
       }
     }
     mark(point);
-    label(step === 'vertex-pos' ? 'P · 玻璃原点' : pointName, point, 'ink', -19, 8);
+    const startName = step === 'vertex-pos' ? 'P · 玻璃原点' :
+      step === 'dot' && data.tilt === 0 ? 'P = P1 = P2' : pointName;
+    label(startName, point, 'ink', -19, 8);
     return {strokes, labels, markers};
   }
 
@@ -299,6 +365,128 @@ const GlassLab = (() => {
       pen.fillRect(left - 4, point[1] - 11, length + 8, 22);
       pen.fillStyle = color;
       pen.fillText(text, ...point);
+    }
+
+    function rightAngle(corner, horizontal, vertical) {
+      const edge = [corner[0] + horizontal, corner[1]];
+      const opposite = [edge[0], edge[1] + vertical];
+      segment(edge, opposite, muted, 1.4);
+      segment(opposite, [corner[0], opposite[1]], muted, 1.4);
+    }
+
+    if (step === 'frame') {
+      const green = '#76d4a0';
+      const start = [width / 2, height * .72];
+      const length = Math.min(width * .29, height * .49);
+      const [normalX, , normalZ] = data.normal;
+      const tip = [start[0] + normalX * length, start[1] - normalZ * length];
+      const zeroTip = [start[0], start[1] - length];
+      const zFoot = [start[0], tip[1]];
+      const angle = radians(data.turn);
+      const angleRadius = length * .40;
+      const side = Math.sign(normalX) || 1;
+
+      segment([20, start[1]], [width - 20, start[1]], '#6ba3b478', 1.5);
+      segment([start[0], zeroTip[1] - 6], [start[0], start[1] + 16], '#6ba3b478', 1.5);
+      pen.beginPath();
+      pen.arc(...start, length, Math.PI, 2 * Math.PI);
+      pen.strokeStyle = '#6ba3b454';
+      pen.lineWidth = 1.5;
+      pen.stroke();
+      label('−X', [19, start[1] + 18], muted);
+      label('+X', [width - 19, start[1] + 18], muted, 'right');
+      label('+Z · 0° 的 N', [start[0], zeroTip[1] - 21], muted, 'center');
+
+      if (data.turn !== 0) {
+        segment(start, zeroTip, muted, 1.5, true);
+        segment(start, zFoot, aqua, 2, true);
+        segment(zFoot, tip, aqua, 2, true);
+        pen.beginPath();
+        pen.arc(...start, angleRadius, -Math.PI / 2, -Math.PI / 2 + angle, angle < 0);
+        pen.strokeStyle = amber;
+        pen.lineWidth = 2;
+        pen.stroke();
+      }
+      if (Math.abs(tip[0] - start[0]) > 18 && start[1] - tip[1] > 18) {
+        rightAngle(zFoot, side * 10, 10);
+      }
+
+      arrow(start, tip, green);
+      dotAt(start, 4.5, ink, '#132025');
+      label('P', [start[0], start[1] + 21], ink, 'center');
+      label('N', [tip[0] + side * 12, tip[1] + (normalZ < .15 ? 20 : 10)], green, side > 0 ? 'left' : 'right');
+      if (Math.abs(tip[0] - start[0]) > 49) {
+        label(`X ${number(normalX, 3)}`, [(tip[0] + start[0]) / 2, tip[1] - 16], aqua, 'center');
+      }
+      if (start[1] - tip[1] > 39) {
+        label(`Z ${number(normalZ, 3)}`, [start[0] - side * 12, (tip[1] + start[1]) / 2], aqua, side > 0 ? 'right' : 'left');
+      }
+      label(`θ = ${data.turn}°`, [18, height - 22], amber);
+      return;
+    }
+
+    if (step === 'decode-foot') {
+      const [alongT, alongB] = data.ts;
+      const scale = Math.min((width - 115) / .66, (height - 86) / .5, 275);
+      const start = [width / 2 - alongT * scale / 2, height / 2 + alongB * scale / 2];
+      const elbow = [start[0] + alongT * scale, start[1]];
+      const foot = [elbow[0], start[1] - alongB * scale];
+      segment([22, start[1]], [width - 22, start[1]], '#6ba3b454', 1);
+      segment([start[0], 23], [start[0], height - 23], '#6ba3b454', 1);
+      label('+T', [width - 21, start[1] - 15], muted, 'right');
+      label('+B', [start[0] + 12, 23], muted);
+      if (data.planarLength === 0) {
+        dotAt(start, 5, ink, '#132025');
+        label('P = H', [start[0] + 10, start[1] + 18], aqua);
+        return;
+      }
+      segment(start, elbow, '#59c6ff', 3);
+      segment(elbow, foot, amber, 3);
+      segment(start, foot, aqua, 3);
+      if (Math.abs(alongT) * scale > 27 && Math.abs(alongB) * scale > 22) {
+        const side = Math.sign(alongT);
+        const up = Math.sign(alongB);
+        rightAngle(elbow, -side * 12, -up * 12);
+        label('x', [(start[0] + elbow[0]) / 2, elbow[1] + up * 17], '#59c6ff', 'center');
+        label('y', [foot[0] + side * 13, (elbow[1] + foot[1]) / 2], amber, 'center');
+        label('PH', [(start[0] + foot[0]) / 2 - side * 12, (start[1] + foot[1]) / 2 - up * 15], aqua, 'center');
+      }
+      dotAt(start, 5, ink, '#132025');
+      dotAt(foot, 4, aqua, '#132025');
+      label('P', [start[0] - Math.sign(alongT) * 13, start[1] + 17], ink, 'center');
+      label('H', [foot[0] + Math.sign(alongT) * 11, foot[1] - Math.sign(alongB) * 17], aqua, 'center');
+      return;
+    }
+
+    if (step === 'decode-z') {
+      const scale = Math.min((width - 150) / .86, (height - 56) / 2);
+      const length = data.planarLength * scale;
+      const rise = data.ts[2] * scale;
+      const start = [width * .46 - length / 2, height / 2];
+      const foot = [start[0] + length, start[1]];
+      const tip = [foot[0], foot[1] - rise];
+      const insideTip = [foot[0], foot[1] + rise];
+      segment([18, start[1]], [width - 18, start[1]], '#6ba3b478', 1.5);
+      segment(start, insideTip, muted, 1.5, true);
+      segment(foot, insideTip, muted, 1.5, true);
+      segment(start, foot, aqua, 3.5);
+      segment(foot, tip, '#76d4a0', 3.5);
+      arrow(start, tip, pink);
+      if (length > 14) rightAngle(foot, -11, -11);
+      dotAt(start, 5, ink, '#132025');
+      if (length > 12) dotAt(foot, 4, aqua, '#132025');
+      dotAt(tip, 4, pink, '#132025');
+      dotAt(insideTip, 4, muted, '#132025');
+      label('玻璃', [19, start[1] + 16], muted);
+      const startLabel = length > 12 ? 'P' : data.planarLength === 0 ? 'P = H' : 'P';
+      label(startLabel, [start[0] - 9, start[1] + 17], ink, 'right');
+      if (length > 12) label('H', [foot[0] + 8, foot[1] + 15], aqua);
+      if (length > 31) label('PH', [(start[0] + foot[0]) / 2, foot[1] - 13], aqua, 'center');
+      label('PQ = 1', [start[0] - 10, start[1] - rise * .56], pink, 'right');
+      label('z', [foot[0] + 12, foot[1] - rise * .5], '#76d4a0');
+      label('Q · 朝外', [tip[0] + 11, tip[1]], pink);
+      label('朝里', [insideTip[0] + 11, insideTip[1]], muted);
+      return;
     }
 
     if (step === 'refraction') {
@@ -475,19 +663,20 @@ const GlassLab = (() => {
     const center = [width / 2, height / 2];
     const radius = Math.min(width, height) * .30;
     const topView = vector => [center[0] + vector[0] * radius, center[1] - vector[2] * radius];
-    const incoming = topView(data.incident.map(value => -value));
+    const incoming = topView(data.viewDir);
     const outgoing = topView(data.reflected);
     const mapped = topView(data.ws);
     arrow(incoming, center, ink);
     arrow(center, outgoing, amber);
     arrow(center, mapped, pink);
     dotAt(center, 5, ink, '#132025');
-    label('相机', [incoming[0], incoming[1] - 16], ink, 'center');
-    label('反射 R', [outgoing[0], outgoing[1] + 17], amber, 'center');
-    label('世界法线', [mapped[0], mapped[1] - 16], pink, 'center');
-    label(`俯视 X / Z 平面　·　R 指向 ${data.face} ${faces[data.face].name}`, [width / 2, height - 18], muted, 'center');
+    label('入射', [incoming[0], incoming[1] - 16], ink, 'center');
+    label('reflDir', [outgoing[0], outgoing[1] + 17], amber, 'center');
+    label('bump', [mapped[0], mapped[1] - 16], pink, 'center');
+    label('P', [center[0] + 9, center[1] - 11]);
+    label(`reflDir → ${data.face} ${faces[data.face].name}`, [width / 2, height - 18], muted, 'center');
   }
 
   return { size, pixel, originUV, bumpUV, seam, brick, blue, faces, pivot, verticesOS,
-    coordinateSteps, coordinateSketch, measure, diagram, number, tuple, cssColor };
+    coordinateSteps, coordinateSketch, measure, normalLegs, diagram, number, tuple, cssColor };
 })();

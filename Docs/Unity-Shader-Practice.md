@@ -25,6 +25,8 @@
 
 URP 14.0.12 的 `ShaderLibrary/Packing.hlsl` 有多种分支。RG/AG 分支先用 `2 × (R × A, G) − 1` 还原 `x、y`。RG 布局令 `A = 1`，AG 布局令 `R = 1`。两种布局都只存切线空间的前两个分量，再按 `z = sqrt(1 − saturate(x² + y²))` 恢复朝外的分量，源码还对 `z` 设了极小的下限。RGB 分支对三个通道各做一次 `2c−1`。[Unity 2022.3 的 Packing.hlsl](https://github.com/Unity-Technologies/Graphics/blob/2022.3/staging/Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl) · [第 10 章的取样和解码算例](Chapter10-GlassRefraction-3D.html#decode)
 
+两通道布局能补出 `z`，靠的是编码时约定法线长 `1` 且朝向表面外侧。设 `P` 是箭尾，`Q` 是箭头尖，`H` 是 `Q` 垂直到表面的落点。沿表面的 `PH² = x² + y²`，再由直角三角形 `PHQ` 得到 `HQ² = 1 − PH²`。开平方给出 `HQ` 的长度，朝外的约定决定沿 `+N` 取正值。[沿两幅图复算](Chapter10-GlassRefraction-3D.html#decode-foot)
+
 <a id="saturate"></a>
 ## `saturate` 为什么常出现在灯光点积后？
 

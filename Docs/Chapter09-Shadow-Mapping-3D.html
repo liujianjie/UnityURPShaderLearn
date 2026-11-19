@@ -27,7 +27,9 @@ header p{margin:0;max-width:66ch;color:var(--sub)}
 .trace-item b{display:block;color:var(--mint);font:13px/1.4 var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .trace-item[data-ready=false] b{color:#9baaa8;font-family:var(--sans)}
 .coordinate-experiment .trace,.coordinate-experiment .steps,.coordinate-experiment .pass-flow,.coordinate-experiment #matrix-jump-top{display:none}
-#matrix-jump-top{margin-top:10px}
+.frame-construction .trace,.frame-construction .pass-flow{display:none}
+.header-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.header-actions .tool:first-child{color:var(--gold);border-color:#907b51}
 .steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:0 0 8px}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
@@ -169,8 +171,11 @@ summary{cursor:pointer;color:var(--ink)}
   <header>
     <p class="eyebrow">第 9 章 · 方向光阴影</p>
     <h1>沿着一条光线</h1>
-    <p>方块顶面的 A 和地板上的 B 可以落进同一格。跟着 A 算出纹理坐标，再移动 B，看看地板上哪一处会被方块挡住。</p>
-    <button class="tool" id="matrix-jump-top" type="button">坐标转换实验 →</button>
+    <p>先用灯光的三根轴和原点构造世界到灯光的矩阵。组装完成后，再用场景里的点练习换算、投影和查阴影。</p>
+    <div class="header-actions">
+      <button class="tool" id="view-jump" type="button">推导世界 → 灯光矩阵</button>
+      <button class="tool" id="matrix-jump-top" type="button">坐标转换实验</button>
+    </div>
   </header>
   <div class="pass-flow" aria-label="阴影图的两个阶段">
     <p><strong>写入深度</strong>从灯光视角画场景，每格留下最靠近灯光的一层。</p>
@@ -180,8 +185,8 @@ summary{cursor:pointer;color:var(--ink)}
   <section class="trace" aria-label="A 的计算结果">
     <div class="trace-head"><strong>计算结果</strong><span>点任一项，回到它的推导。</span></div>
     <div class="trace-grid">
-      <button class="trace-item" type="button" data-trace="0"><span>q · A − O（世界轴）</span><b>待推导</b></button>
-      <button class="trace-item" type="button" data-trace="1"><span>V_light · 灯光坐标</span><b>待推导</b></button>
+      <button class="trace-item" type="button" data-trace="0"><span>q · 从 O 到 A 的位移</span><b>待推导</b></button>
+      <button class="trace-item" type="button" data-trace="1"><span>A · 灯光坐标</span><b>待推导</b></button>
       <button class="trace-item" type="button" data-trace="2"><span>A · NDC 坐标</span><b>待推导</b></button>
       <button class="trace-item" type="button" data-trace="3"><span>A · (u, v, z)</span><b>待推导</b></button>
     </div>
@@ -189,7 +194,7 @@ summary{cursor:pointer;color:var(--ink)}
   <div id="lesson-start">
   <nav class="steps" aria-label="坐标变换步骤">
     <button class="step" type="button" data-step="0" aria-pressed="true"><small>01</small>世界坐标</button>
-    <button class="step" type="button" data-step="1" aria-pressed="false"><small>02</small>V · 换轴</button>
+    <button class="step" type="button" data-step="1" aria-pressed="false"><small>02</small>V · 世界到灯光</button>
     <button class="step" type="button" data-step="2" aria-pressed="false"><small>03</small>P · 投影</button>
     <button class="step" type="button" data-step="3" aria-pressed="false"><small>04</small>写入深度</button>
     <button class="step" type="button" data-step="4" aria-pressed="false"><small>05</small>读取阴影</button>
@@ -251,6 +256,9 @@ summary{cursor:pointer;color:var(--ink)}
         <h2 id="stage-title"></h2>
         <p class="explain" id="explain"></p>
       </div>
+      <div class="extras" id="inverse-aside" hidden>
+        <button class="tool" id="inverse-jump" type="button">题外 · 灯光 → 世界怎么算？</button>
+      </div>
       <div class="matrix-lab" id="matrix-lab" hidden>
         <div id="matrix-sample" hidden>
           <h3>设置标记相对灯光的位置</h3>
@@ -305,7 +313,7 @@ summary{cursor:pointer;color:var(--ink)}
       <div aria-live="polite" aria-atomic="true">
         <p class="formula" id="formula"></p>
         <table class="matrix-table view-row-work" id="view-row-work" hidden>
-          <caption>每列上下两个数相乘，再把四列的乘积相加</caption>
+          <caption>第一行如何计算灯光横坐标，把对应列相乘再相加</caption>
           <thead>
             <tr><th scope="col">对应项</th><th scope="col">世界 X</th><th scope="col">世界 Y</th><th scope="col">世界 Z</th><th scope="col">第 4 格</th></tr>
           </thead>
@@ -4626,8 +4634,16 @@ void main() {
   const matrixRowButtons = [...document.querySelectorAll('[data-matrix-row]')];
   const matrixSourceButtons = [...document.querySelectorAll('[data-matrix-source]')];
   const matrixFloorColumn = id('matrix-floor-column');
-  const viewMatrixSteps = {projectPoint: 9, changeOrigin: 10, compare: 11, rightRow: 12, upRow: 13, backRow: 14, result: 15};
+  const viewMatrixSteps = {
+    sample: 0, displacement: 1, direction: 2, backAxis: 3, upAxis: 4, axes: 5,
+    rightProjection: 6, upProjection: 7, backProjection: 8,
+    originTarget: 9, changeOrigin: 10, compare: 11, rightRow: 12, upRow: 13, backRow: 14, result: 15, apply: 20
+  };
   const viewMatrixRowSteps = [viewMatrixSteps.rightRow, viewMatrixSteps.upRow, viewMatrixSteps.backRow];
+  const viewFrameSteps = [viewMatrixSteps.direction, viewMatrixSteps.backAxis, viewMatrixSteps.upAxis, viewMatrixSteps.axes,
+    viewMatrixSteps.originTarget, ...viewMatrixRowSteps, viewMatrixSteps.result];
+  const viewPointSteps = [viewMatrixSteps.sample, viewMatrixSteps.apply, viewMatrixSteps.changeOrigin, viewMatrixSteps.displacement,
+    viewMatrixSteps.rightProjection, viewMatrixSteps.upProjection, viewMatrixSteps.backProjection, viewMatrixSteps.compare];
   const matrixSteps = {frames: 16, columns: 17, place: 18, shadow: 19};
   const v = (x, y, z) => new T.Vector3(x, y, z);
   const colors = { a: 0xf5c674, b: 0x75ddcc, ray: 0x77bbff, grid: 0x35494b, frame: 0x659393, floor: 0x243738 };
@@ -4663,16 +4679,22 @@ void main() {
   let column = 2, step = 0, micro = 0;
   let matrixColumn = 3, matrixRow = 0;
   let matrixSource = 'marker', originDrag;
-  let matrixReturn, unlockedTraceCount = 0;
+  let matrixReturn;
+  const unlockedTrace = new Set();
   const q = A.clone().sub(O);
   const lightA = A.clone().applyMatrix4(V);
   const ndcA = A.clone().applyMatrix4(PV);
   const texA = ndcA.clone().multiplyScalar(.5).addScalar(.5);
   const viewLesson = () => step === 1;
-  const matrixLesson = () => viewLesson() && micro >= matrixSteps.frames;
-  const viewDerivation = () => viewLesson() && micro >= viewMatrixSteps.projectPoint && micro <= viewMatrixSteps.result;
+  const matrixLesson = () => viewLesson() && micro >= matrixSteps.frames && micro <= matrixSteps.shadow;
+  const buildingView = () => viewLesson() && viewFrameSteps.includes(micro);
+  const frameConstruction = () => step === 0 || buildingView();
+  const viewDerivation = () => viewLesson() && (
+    micro === viewMatrixSteps.originTarget || viewMatrixRowSteps.includes(micro) ||
+    micro === viewMatrixSteps.result || micro === viewMatrixSteps.apply
+  );
   const markerInput = () => v(matrixSliders[0].valueAsNumber, matrixSliders[1].valueAsNumber, -matrixSliders[2].valueAsNumber);
-  const pointTrialActive = () => viewDerivation() || (viewLesson() && micro === 6);
+  const pointTrialActive = () => viewLesson() && viewPointSteps.includes(micro);
   const projectLesson = () => step === 2 && micro < 4;
   const writing = () => step === 3 && micro === 3;
   const textureLesson = () => step === 3 && !writing();
@@ -4731,30 +4753,25 @@ void main() {
       detail
     ];
   }
-  function viewMatrixProjectPointLesson() {
-    const pointComponents = A.toArray();
-    const axisComponents = R.toArray();
-    const products = axisComponents.map((value, index) => value * pointComponents[index]);
+  function viewMatrixOriginLesson() {
     return [
-      '从世界原点算 A 的投影',
-      '世界坐标 A 的三个数，表示从世界原点 W 沿世界 X、Y、Z 各走多少。红色数轴经过 W，方向和灯光右轴 R 一致。\n\n把 A 垂直投到红线上得到 A′。R 的长度是 1，所以点积 R · A 给出的就是从 W 到 A′ 沿红线的带符号长度。',
-      'R · A = R.x × A.x + R.y × A.y + R.z × A.z',
+      '用灯光原点 O 确定第四列',
+      'V_light 的输入用世界坐标，输出用灯光坐标。把 R、U、K 的世界分量依次填进前三行，各管一个输出。最后一列的前三个数，是为了把灯光原点 O 的三个读数清零。',
+      'V_light × ' + pointTuple4(O) + ' 应得到 (0, 0, 0, 1)',
       [
-        reading('A 的世界坐标（X、Y、Z）', tuple(A), 'a'),
-        reading('R 沿世界 X、Y、Z 的分量', tuple(R)),
-        ...products.map((value, index) => reading('世界 ' + ['X', 'Y', 'Z'][index] + ' 项',
-          fmt(axisComponents[index]) + ' × (' + fmt(pointComponents[index]) + ') = ' + fmt(value))),
-        reading('三个乘积相加', products.map(fmt).join(' + ') + ' = ' + fmt(R.dot(A)), 'a')
+        reading('输入 · O 的世界坐标', tuple(O)),
+        reading('目标 · O 的灯光坐标', '(0, 0, 0)'),
+        reading('待求 · 前三行的第四格', 'c_R、c_U、c_K')
       ],
-      'A.x 是 A 的世界 X，R.x 是 R 沿世界 X 的分量。同一个方向的两个数相乘，再将三项相加。此时得到的是以 W 为零的刻度。'
+      '坐标末尾补 1，让第四格乘 1 后加进每行。第四行是 (0, 0, 0, 1)，用来保留输出末尾的 1。下一步只求第一行。'
     ];
   }
   function viewMatrixChangeOriginLesson() {
     const pointProjection = fmt(R.dot(A));
     const originProjection = fmt(R.dot(O));
     return [
-      '把灯光原点 O 的刻度设为 0',
-      '把灯光原点 O 也垂直投到同一条红线上，得到 O′。此时 A′ 和 O′ 的刻度都从 W 算起。\n\n要从 O′ 开始量，就让这条线上每个旧刻度都减去 O′ 的旧刻度。O′ 会变成 0，A′ 的新刻度就是灯光横坐标。',
+      '应用第一行，在同一刻度上相减',
+      '已填好的第一行分别用 R 给 A、O 投影读数。这两个读数来自同一条过世界原点 W、沿 R 方向的红色数轴。让 A 的读数减去 O 的读数，就改成从灯光原点起算。',
       '灯光横坐标 xₗ = A′ 的旧刻度 − O′ 的旧刻度',
       [
         reading('O 的世界坐标', tuple(O)),
@@ -4788,41 +4805,45 @@ void main() {
       '把三个方向中含 A 的项加起来，得到 R · A。把含 O 的项加起来，得到 R · O。这三项前面都有减号，所以总和就是 R · A − R · O。'
     ];
   }
-  function viewMatrixRowMultiplication(rowIndex) {
-    const coefficients = [0, 1, 2, 3].map(columnIndex => V.elements[columnIndex * 4 + rowIndex]);
-    const input = [...A.toArray(), 1];
-    const products = coefficients.map((value, index) => value * input[index]);
-    return {coefficients, input, products};
-  }
-  function viewMatrixRowLesson(rowIndex, title, explain, detail) {
+  function viewMatrixRowLesson(rowIndex) {
     const axis = axes[rowIndex];
     const symbol = ['R', 'U', 'K'][rowIndex];
     const coordinate = ['xₗ', 'yₗ', 'zₗ'][rowIndex];
     const originProjection = axis.dot(O);
-    const {products} = viewMatrixRowMultiplication(rowIndex);
-    const sum = products.map(value => value < 0 ? '(' + fmt(value) + ')' : fmt(value)).join(' + ');
     return [
-      title, explain,
-      coordinate + ' = ' + symbol + ' · A − ' + symbol + ' · O',
+      '只代 O，求' + ['第一', '第二', '第三'][rowIndex] + '行的第四格',
+      '前三格是 ' + symbol + ' 的世界分量。右边输入 O 的世界坐标，前三格和输入逐项相乘后相加，得到 ' +
+        symbol + ' · O。第四格 c 乘末尾的 1，再加进总和。O 在灯光坐标系里的 ' + coordinate + ' 必须为 0。',
+      symbol + ' · O + c = ' + fmt(originProjection) + ' + c = 0',
       [
-        reading('拿 O 算第四格', '−(' + dotTerms(O, axis) + ') = ' + fmt(-originProjection)),
-        reading('把四个乘积相加', sum + ' = ' + fmt(lightA.getComponent(rowIndex)), 'a')
+        reading('前三格合计 · ' + symbol + ' · O', dotTerms(O, axis) + ' = ' + fmt(originProjection)),
+        reading('解出第四格 c', '−' + symbol + ' · O = ' + fmt(-originProjection), 'a'),
+        reading('填好的这一行', '[' + [...axis.toArray(), -originProjection].map(fmt).join(', ') + ']')
       ],
-      detail
+      '图上的 O′ 是灯光原点投到过 W 的这根轴上的落点。加上第四格后，O 的这一轴读数为 ' +
+        fmt(originProjection) + ' + (' + fmt(-originProjection) + ') = 0。'
     ];
   }
   function viewMatrixResultLesson() {
     const lightOrigin = O.clone().applyMatrix4(V);
     return [
-      '合成 V_light，再用灯光原点验算',
-      '前三行各算一个灯光坐标，依次得到 xₗ、yₗ、zₗ。第四行 (0, 0, 0, 1) 把点末尾的 1 原样传给输出。这样输出仍有四项，可以交给下一阶段的投影矩阵 P。',
+      '组装 V_light，用 O 验算整张矩阵',
+      '前三行各填一根轴，再填这根轴对应的第四格。把 O 输入整张矩阵，三个读数分别减去自身。第四行保留点末尾的 1。',
+      'V_light × ' + pointTuple4(O) + ' = ' + pointTuple4(lightOrigin),
+      axes.map((axis, index) => {
+        const projection = fmt(axis.dot(O));
+        return reading(['xₗ', 'yₗ', 'zₗ'][index], projection + ' − (' + projection + ') = 0');
+      }),
+      '原点和三根轴给定后，这张世界到灯光的矩阵就确定了。下一步才选一个场景点来使用它。'
+    ];
+  }
+  function viewMatrixApplyLesson() {
+    return [
+      '用已组装的 V_light 换算 A',
+      '现在把方块顶面 A 的世界坐标输入矩阵。每一行输出一个灯光坐标，用同一根轴给 A 和 O 读数，再求差。',
       'V_light × ' + pointTuple4(A) + ' = ' + pointTuple4(lightA),
-      [
-        reading('第四行的计算', '0 × X + 0 × Y + 0 × Z + 1 × 1 = 1'),
-        reading('把灯光原点 O 当作输入', pointTuple4(O)),
-        reading('O 在自己的坐标系里', pointTuple4(lightOrigin), 'a')
-      ],
-      '输入 O 时，前三行都在算 O 的投影刻度减去自身，所以灯光坐标前三项都是 0。图中的三段彩色箭头依次从 O 走向 A，对应矩阵算出的三个带符号长度。'
+      [reading('输入 · A 的世界坐标', tuple(A), 'a'), reading('输出 · A 的灯光坐标', tuple(lightA), 'a')],
+      '移动 A 会更换右边的输入列。左边仍然用由 O、R、U、K 构造的同一张矩阵。'
     ];
   }
   function matrixExperiment() {
@@ -4854,10 +4875,10 @@ void main() {
   }
   function matrixColumnLesson() {
     return [
-      '怎样拼出「灯光坐标 → 世界坐标」矩阵？',
-      '先问两个简单问题：灯光原点在世界的哪儿？沿灯光的一根轴移一格，在世界里会多出哪段位移？一个位置加上三段方向，刚好填四列。',
-      '', [],
-      '先选「只看原点 O」，再选「右移一格 R」。对比原点和箭头末端的世界读数。'
+      '题外 · 灯光 → 世界的逆视图矩阵',
+      '输入是灯光坐标 (xₗ, yₗ, zₗ)，表示从 O 沿右轴 R、上轴 U、后轴 K 分别量了多少。三根轴已经用世界分量表示，所以乘上各自的读数，再加 O 的世界位置，就得到世界坐标。',
+      '世界位置 = xₗR + yₗU + zₗK + 1 × O 的世界位置', [],
+      '先点「只看原点 O」验算第四列，再逐轴移动一格，看看前三列分别贡献哪段世界位移。'
     ];
   }
   function matrixForwardLesson() {
@@ -4883,14 +4904,18 @@ void main() {
     return cell;
   }
   function updateMatrixGuide() {
-    const showingView = viewLesson() && micro === viewMatrixSteps.result;
+    const originTarget = viewLesson() && micro === viewMatrixSteps.originTarget;
+    const showingView = originTarget || (viewLesson() && (micro === viewMatrixSteps.result || micro === viewMatrixSteps.apply));
     const active = matrixLesson();
     viewport.closest('main').classList.toggle('coordinate-experiment', active);
+    viewport.closest('main').classList.toggle('frame-construction', frameConstruction());
     id('matrix-lab').hidden = !active && !showingView;
     id('origin-controls').hidden = !active;
     id('origin-handles').hidden = !active || !renderer;
-    id('setup').hidden = active;
-    id('scene-help').textContent = active ? '拖空白处旋转视角，滚轮或双指缩放。' : '拖动旋转，滚轮或双指缩放。「沿光线看」只改变观察角度。';
+    id('setup').hidden = active || frameConstruction();
+    id('scene-help').textContent = frameConstruction() || viewLesson() || projectLesson() || textureLesson()
+      ? '拖空白处旋转视角，滚轮或双指缩放。'
+      : '拖动旋转，滚轮或双指缩放。「沿光线看」只改变观察角度。';
     if (!active && !showingView) return;
 
     const frames = micro === matrixSteps.frames;
@@ -4903,7 +4928,9 @@ void main() {
     const tones = ['axis-right', 'axis-up', 'axis-back', ''];
     id('matrix-flow').hidden = !active;
     id('matrix-derivation').hidden = frames;
-    id('matrix-derivation-title').textContent = reversing ? '展开世界 → 灯光矩阵的推导' : '展开灯光 → 世界矩阵的推导';
+    id('matrix-derivation-title').textContent = originTarget ? '待填第四列的矩阵'
+      : showingView ? '世界 → 灯光矩阵 V_light'
+      : reversing ? '展开世界 → 灯光矩阵的推导' : '展开灯光 → 世界矩阵的推导';
     id('matrix-columns').hidden = !building;
     id('matrix-sample').hidden = !placing;
     id('matrix-rows').hidden = !querying;
@@ -4935,14 +4962,14 @@ void main() {
     if (frames) return;
 
     id('matrix-caption').textContent = reversing ? 'V_light（视图矩阵） · 输入世界坐标，输出灯光坐标'
-      : '灯光 → 世界矩阵 · 每列在世界坐标里表示什么';
-    id('matrix-bridge').textContent = reversing
+      : 'V_light⁻¹（逆视图矩阵） · 输入灯光坐标，输出世界坐标';
+    id('matrix-bridge').textContent = showingView ? '' : reversing
       ? '每行对应一根灯光轴。前三项和输入点的世界坐标做点积，得到以 W 为零的投影刻度。第四项扣掉 O 在同一根轴上的投影刻度，把零点改到 O。用 O 自己验算时，每行都是同一个刻度减去自身，三个灯光坐标都为 0。'
-      : '从世界原点看，测试点的位置分成两段：先到灯光原点 O，再按灯光的三根轴给出偏移。前三列装这三根单位轴，第四列装 O 在世界中的坐标。点的输入补 1，让第四列加一次。';
+      : '矩阵乘输入列时，把每一列乘对应的输入，再把四列的贡献相加。前三列依次填 R、U、K 的世界分量，第四列填 O 的世界坐标。点的末尾补 1，加一次 O，第四行保留输出末尾的 1。';
     const coefficients = [...(experiment?.local.toArray() ?? [0, 0, 0]), 1];
-    const headers = reversing ? ['X', 'Y', 'Z', '−轴·O'] : ['R', 'U', 'K', 'O'];
+    const headers = reversing ? ['世界 X', '世界 Y', '世界 Z', '第四格'] : ['R', 'U', 'K', 'O'];
     const columnHeaders = headers.map((label, index) => {
-      const text = placing ? label + ' × ' + fmt(coefficients[index]) : label;
+      const text = building || placing ? label + ' × ' + fmt(coefficients[index]) : label;
       return matrixCell('th', text, reversing ? '' : tones[index], building && index === matrixColumn);
     });
     columnHeaders.unshift(matrixCell('th', '输出', '', false));
@@ -4954,12 +4981,14 @@ void main() {
       header.scope = 'row';
       tr.append(header);
       tr.append(...headers.map((_, col) => {
-        const highlighted = (querying && row === matrixRow) || (building && col === matrixColumn);
-        return matrixCell('td', fmt(matrix.elements[col * 4 + row]), tones[reversing ? row : col], highlighted);
+        const pending = originTarget && col === 3 && row < 3;
+        const highlighted = pending || (querying && row === matrixRow) || (building && col === matrixColumn);
+        const value = pending ? ['c_R', 'c_U', 'c_K'][row] : fmt(matrix.elements[col * 4 + row]);
+        return matrixCell('td', value, tones[reversing ? row : col], highlighted);
       }));
       return tr;
     }));
-    id('matrix-arithmetic').textContent = matrixArithmetic(experiment, building, placing, querying);
+    id('matrix-arithmetic').textContent = showingView ? '' : matrixArithmetic(experiment, building, placing, querying);
   }
 
   function updateViewMatrixRow() {
@@ -4967,14 +4996,18 @@ void main() {
     id('view-row-work').hidden = rowIndex < 0;
     if (rowIndex < 0) return;
 
-    const {coefficients, input, products} = viewMatrixRowMultiplication(rowIndex);
+    const axis = axes[rowIndex];
+    const input = [...O.toArray(), 1].map(fmt);
+    const coefficients = [...axis.toArray().map(fmt), 'c'];
+    const products = [...O.toArray().map((value, index) => fmt(value * axis.getComponent(index))), 'c'];
     const axisTone = ['axis-right', 'axis-up', 'axis-back'][rowIndex];
-    const rows = [['矩阵行', coefficients, axisTone], ['输入 A', input, ''], ['乘积', products, '']];
+    id('view-row-work').caption.textContent = '第' + ['一', '二', '三'][rowIndex] + '行如何计算，把对应列相乘再相加';
+    const rows = [['待定的矩阵行', coefficients, axisTone], ['输入 O', input, ''], ['乘积', products, '']];
     id('view-row-body').replaceChildren(...rows.map(([label, values, tone]) => {
       const row = document.createElement('tr');
       const heading = matrixCell('th', label, '', false);
       heading.scope = 'row';
-      row.append(heading, ...values.map((value, index) => matrixCell('td', fmt(value), tone, index === 3)));
+      row.append(heading, ...values.map((value, index) => matrixCell('td', value, tone, index === 3)));
       return row;
     }));
   }
@@ -4983,10 +5016,12 @@ void main() {
     if (building) {
       const start = '输入 ' + pointTuple4(experiment.local) + '。';
       if (matrixColumn === 3) {
-        return start + '前三列都乘 0，第四列乘 1，输出就是灯光原点的世界坐标 ' + tuple(lightOriginInWorld) + '。';
+        return start + '灯光坐标 (0, 0, 0) 是 O。前三列都乘 0，只留下第四列乘 1。为了得到 O 的世界位置，第四列前三格就填 ' + tuple(lightOriginInWorld) + '。';
       }
       const axisTag = ['R', 'U', 'K'][matrixColumn];
-      return start + 'O 的世界位置 ' + tuple(lightOriginInWorld) + ' 加上 ' + axisTag + ' 方向 ' + tuple(axes[matrixColumn]) + '，得到测试点 ' + tuple(experiment.world) + '。两点相减正好是 ' + axisTag + '，这就是该列填的数。';
+      return start + '第 ' + (matrixColumn + 1) + ' 列和第四列各乘 1。图上从 O 沿 ' + axisTag + ' 走一格，世界位置从 ' +
+        tuple(lightOriginInWorld) + ' 到 ' + tuple(experiment.world) + '。用末端位置减 O，得到位移 ' +
+        tuple(axes[matrixColumn]) + '，这就是该列的前三格。';
     }
     if (placing) {
       const pieces = axes.map((axis, index) => tuple(axis.clone().multiplyScalar(experiment.local.getComponent(index))));
@@ -5024,32 +5059,27 @@ void main() {
       (cell ? '这格保存 ' + ztext(cell.depth) + '。' + (uv.z > cell.depth + flatZ ? '点在格内记录的表面后方，判为阴影。' : '点通过深度比较，判为受光。') : '');
   }
   const viewLessons = [
-    () => ['认清世界点 A 和参考原点 O', '灰色 X、Y、Z 是世界轴。A 在方块顶面，O 是示例给灯光视图选的原点。接着给灯光视图选出它自己的三根轴。', 'A 和 O 都按世界 X、Y、Z 读数', [reading('A · 世界位置', tuple(A), 'a'), reading('O · 示例直接设定', tuple(O))], '场景下方的参数区给出了 A 的默认构造和当前位置。'],
+    () => ['矩阵组装完成，再引入 A', 'A 是方块顶面上的一个示例点。现在已经有了世界到灯光的矩阵，接下来用它读取这个点的灯光坐标。', '下一步把 A 的世界坐标作为输入', [reading('待换算的输入 · A', tuple(A), 'a')], '默认位置按灯光的右 1、上 2、前 3 放好，方便核对换算出的结果。'],
     () => ['A − O：求从 O 指向 A 的位移 q', '从世界原点 W 到 A、到 O，是两支灰箭头。金色箭头从 O 出发，因此每一项用 A 的世界坐标减去 O 的世界坐标。', 'q = ' + tuple(A) + ' − ' + tuple(O) + ' = ' + tuple(q), [reading('q · 按世界 X、Y、Z 记', tuple(q), 'a')], '下一步用刚得到的 q 与右轴 R 做点积，读出第一项灯光坐标。'],
     ['先选光线方向：向右 3、向下 4', '图上浅蓝线从 O 指出去，沿世界 +X 走 3、沿世界 −Y 走 4。这是示例先选的方向。蓝色 F 是把这支长度为 5 的箭头缩成单位长度，方向没有变。', 'F = (3, −4, 0) ÷ √(3² + 4²) = (0.6, −0.8, 0)', [reading('先选 · 世界轴分量', tuple(lightDirection)), reading('算出 · 单位光线方向 F', tuple(F))], 'F 表示光往哪儿走。方向箭头的起点画在 O，只是为了对照接下来的三根灯光轴。'],
     ['把 F 反过来，就得到后轴 K', '光线往前走，图里的蓝色 K 朝相反方向。我们约定灯光坐标的正 Z 指向后方，所以 K 是这套坐标系的正 Z 轴。', 'K = −F = (−0.6, 0.8, 0)', [reading('F · 光线向前', tuple(F)), reading('K · 灯光后轴', tuple(backward))], 'F 和 K 都用世界 X、Y、Z 写。光线已经定了 K，但还没定画面哪边是上。'],
     ['再选画面哪边算「上」', '想象沿着光线举起相机：保持镜头朝向，你仍能转动机身。这里选世界 −Z 当画面上方。绿色 U 就是这根上轴。', 'U = (0, 0, −1)；U · K = 0', [reading('另选 · 灯光上轴 U', tuple(U)), reading('检查 · 与后轴夹角', '90°')], 'K 完全在世界 XY 平面内，Z 分量是 0；U 只沿世界 Z 轴，所以二者垂直。U 是示例选的，不能只凭光线方向算出来。'],
-    ['O 和 R、U、K 定义灯光坐标系', '绿色 U 和蓝色 K 定好后，按右手坐标系取 U × K，得到红色右轴 R。灯光坐标从 O 开始量，沿 R、U、K 的带符号距离分别记为 xₗ、yₗ、zₗ。', 'R = (0, 0, −1) × (−0.6, 0.8, 0) = (0.8, 0.6, 0)', [reading('O · 世界位置', tuple(O)), reading('R · 灯光 +xₗ', tuple(R)), reading('U · 灯光 +yₗ', tuple(U)), reading('K · 灯光 +zₗ', tuple(backward))], '接下来从 O 指向 A，再用三根轴量同一支位移。'],
+    ['每根轴填入一行的前三格', '取 U × K 得到红色右轴 R。R、U、K 都用世界分量来写。每根轴的三个分量填进一行的前三格，与输入点的世界坐标做点积。', 'R = (0, 0, −1) × (−0.6, 0.8, 0) = (0.8, 0.6, 0)', [reading('第 1 行 · R 读 xₗ', tuple(R)), reading('第 2 行 · U 读 yₗ', tuple(U)), reading('第 3 行 · K 读 zₗ', tuple(backward))], '下一步用灯光原点 O 确定这些行的第四格。'],
     rightAxisLesson,
     () => viewAxisLesson(1, '点积读出上轴刻度 yₗ', '把同一支 q 投到绿色的 U 轴。U 指向世界 −Z，点积只取 q 的世界 Z 分量再乘 −1。', '滑块沿世界 X 移动，q 的世界 Z 分量保持 −2，所以这里仍读到 +2。'),
     () => viewAxisLesson(2, '点积读出后轴刻度 zₗ', '把同一支 q 投到蓝色的 K 轴。这个例子里 A 的垂足落在 K 的反方向。', '沿光线向前的距离 d = −zₗ = ' + fmt(-lightA.z) + '，投影时会用到 d。'),
-    viewMatrixProjectPointLesson,
+    viewMatrixOriginLesson,
     viewMatrixChangeOriginLesson,
     viewMatrixCompareLesson,
-    () => viewMatrixRowLesson(0, '写出矩阵第一行，算灯光横坐标',
-      '矩阵的一行会把同一列的两个数相乘，再把乘积加起来。把 R 的 X、Y、Z 分量放进前三格，正好能和 A 的世界 X、Y、Z 相乘，算出 R · A。\n\n第四格要把固定的 −R · O 加进总和。乘法需要两个数，所以在输入 (X, Y, Z) 后补一个 1。第四格就能算 (−R · O) × 1，把原来的负数加进去，也就是扣掉 O 的旧刻度。',
-      '移动 A，表里输入的世界 X 会变。灯光原点 O 和输入末尾的 1 都固定，所以第四格的乘积保持不变。'),
-    () => viewMatrixRowLesson(1, '写出矩阵第二行，算灯光高度',
-      '把测量方向换成上轴 U，起点仍从世界原点移到灯光原点。前三格填 U 的三个世界分量，计算 U · A。第四格填 −U · O，乘输入末尾的 1。',
-      'U 朝世界 −Z，所以前两格的乘积为 0。A 和 O 的世界 Z 先各乘 −1，再相减，得到沿 U 的灯光高度。'),
-    () => viewMatrixRowLesson(2, '写出矩阵第三行，算灯光 Z',
-      '把测量方向换成后轴 K。前三格填 K 的三个世界分量，计算 K · A。第四格填 −K · O，扣掉灯光原点的旧刻度。',
-      'K 指向灯光后方。灯光 Z 为负数时，表示 A 在灯光原点的前方。下一阶段会把 −zₗ 当成向前量的深度。'),
+    () => viewMatrixRowLesson(0),
+    () => viewMatrixRowLesson(1),
+    () => viewMatrixRowLesson(2),
     viewMatrixResultLesson,
     matrixFrameLesson,
     matrixColumnLesson,
     matrixForwardLesson,
-    matrixReverseLesson
+    matrixReverseLesson,
+    viewMatrixApplyLesson
   ];
   const projectionRanges = [[-4, 4], [0, 8], [0, 10]];
   const projectionInput = axis => axis === 2 ? -lightA.z : lightA.getComponent(axis);
@@ -5088,13 +5118,16 @@ void main() {
   ];
   const lessons = {1: viewLessons, 2: projectionLessons, 3: textureLessons};
   const course = [
-    [[0, '认识 A 和 B']],
-    [[0, '认识 A、O'], [2, '选光线方向 F'], [3, '求后轴 K'], [4, '选上轴 U'], [5, '定灯光坐标系'],
-      [1, '计算位移 q'], [6, '读右轴 xₗ'], [7, '读上轴 yₗ'], [8, '读后轴 zₗ'],
-      [viewMatrixSteps.projectPoint, '算 A 的投影刻度'], [viewMatrixSteps.changeOrigin, '把零点移到 O'],
-      [viewMatrixSteps.compare, '比较两种算法'], [viewMatrixSteps.rightRow, '写第一行 · 右轴'],
-      [viewMatrixSteps.upRow, '写第二行 · 上轴'], [viewMatrixSteps.backRow, '写第三行 · 后轴'],
-      [viewMatrixSteps.result, '合成 V_light 并验算']],
+    [[0, '认识世界原点 W 和灯光原点 O']],
+    [[viewMatrixSteps.direction, '选光线方向 F'], [viewMatrixSteps.backAxis, '求后轴 K'],
+      [viewMatrixSteps.upAxis, '选上轴 U'], [viewMatrixSteps.axes, '用 R、U、K 定前三行'],
+      [viewMatrixSteps.originTarget, 'O 在灯光坐标里要读到零'],
+      [viewMatrixSteps.rightRow, '代 O 求第一行第四格'], [viewMatrixSteps.upRow, '代 O 求第二行第四格'],
+      [viewMatrixSteps.backRow, '代 O 求第三行第四格'], [viewMatrixSteps.result, '组装矩阵并代 O 验算'],
+      [viewMatrixSteps.sample, '引入试算点 A'], [viewMatrixSteps.apply, '输入 A，使用已组装的矩阵'],
+      [viewMatrixSteps.changeOrigin, '同一刻度上相减'], [viewMatrixSteps.displacement, '计算位移 q'],
+      [viewMatrixSteps.rightProjection, '读右轴 xₗ'], [viewMatrixSteps.upProjection, '读上轴 yₗ'],
+      [viewMatrixSteps.backProjection, '读后轴 zₗ'], [viewMatrixSteps.compare, '比较两种算法']],
     [[0, '认识覆盖盒'], [1, '换横向刻度'], [2, '换纵向刻度'], [3, '换深度刻度'], [4, '合成 NDC']],
     [[0, '计算 u'], [1, '计算 v 并定位纹素'], [2, '计算 A 自身深度'], [3, '每格保存最近深度']],
     [[0, '取得 B 的世界位置'], [1, '用 B 的 UV 找格'], [2, '比较两个深度']]
@@ -5105,12 +5138,12 @@ void main() {
     [matrixSteps.place, '用灯光坐标在场景里放标记'],
     [matrixSteps.shadow, '用世界坐标查阴影图']
   ];
-  const traceMarks = [[1, 1, q], [1, viewMatrixSteps.result, lightA, viewMatrixSteps.projectPoint], [2, 4, ndcA], [3, 2, texA]];
+  const traceMarks = [[1, viewMatrixSteps.displacement, q], [1, viewMatrixSteps.apply, lightA], [2, 4, ndcA], [3, 2, texA]];
   const track = () => matrixLesson() ? matrixTrack : course[step];
   const stepIndex = () => track().findIndex(([number]) => number === micro);
 
   function updateTrace() {
-    const input = viewLesson() && !matrixLesson() && micro >= 6 ? 0
+    const input = viewLesson() && [viewMatrixSteps.rightProjection, viewMatrixSteps.upProjection, viewMatrixSteps.backProjection, viewMatrixSteps.compare].includes(micro) ? 0
       : step === 2 ? 1
       : textureLesson() ? 2
       : writing() ? 3 : -1;
@@ -5118,9 +5151,9 @@ void main() {
       const reached = !matrixLesson() && (
         step > stage || (step === stage && stepIndex() >= course[stage].findIndex(([number]) => number === substep)
       ));
-      if (reached) unlockedTraceCount = Math.max(unlockedTraceCount, index + 1);
+      if (reached) unlockedTrace.add(index);
       const button = traceButtons[index];
-      const ready = index < unlockedTraceCount;
+      const ready = unlockedTrace.has(index);
       button.dataset.ready = String(ready);
       button.dataset.input = String(index === input);
       button.querySelector('b').textContent = ready ? tuple(value) : '待推导';
@@ -5130,7 +5163,7 @@ void main() {
   }
 
   const stages = [
-    ['世界坐标', '在世界空间找到 A 和 B'],
+    ['世界坐标', '认识世界原点 W 和灯光原点 O'],
     ['V · 换轴'],
     ['P · 正交投影'],
     ['写入深度', '每个纹素保留最近深度'],
@@ -5143,11 +5176,9 @@ void main() {
     const bDepth = -sample.start.y / F.y;
     const comparison = ztext(bt.z) + (occluded ? ' > ' : ' = ') + ztext(sample.depth) + (occluded ? '，B 被方块挡住' : '，B 受光');
     const address = gridAddress();
-    const worldExplanation = onRayThroughA(sample)
-      ? '这条中心射线先经过方块顶面的 A，再碰到地板上的 B。点「沿光线看」，观察两点怎样在灯光眼里重叠。'
-      : '金色虚线经过 A，蓝线经过 B，两条射线平行。点「沿光线看」，观察它们在灯光视角里的间隔。';
     const descriptions = [
-      [worldExplanation, 'A 是方块顶面点，B 是选中纹素的中心射线与地板的交点。'],
+      ['灰色 X、Y、Z 从世界原点 W 开始量。白点 O 是灯光的原点，同一个 O 在自己的坐标系里从零起算。接下来给灯光定三根轴，构造把世界坐标转换为灯光坐标的矩阵。',
+        '同一个 O · 世界坐标 ' + tuple(O) + ' → 灯光坐标 (0, 0, 0)'],
       [], [],
       ['从每个纹素的中心沿光线方向找交点。框选的是当前观察格，换一列可以看见别的射线命中了什么。', hitsBlock
         ? 'min(初始值 1.00, 地板 ' + ztext(sample.groundDepth) + ', 方块 ' + ztext(sample.cubeDepth) + ') = ' + ztext(sample.depth)
@@ -5155,7 +5186,7 @@ void main() {
       ['B 的 UV 已经选好纹素。普通 Z 下数值越小越靠近灯光。如果这格保存的深度比 B 小，光就在到达 B 前被挡住。', comparison]
     ];
     const values = [
-      [['A · 世界', tuple(A), 'a'], ['B · 世界', tuple(B), 'b']],
+      [reading('W · 世界坐标', '(0, 0, 0)'), reading('O · 世界坐标', tuple(O))],
       [], [],
       [reading('A 落在哪格', gridAddress(rowA(), colA()) + ' · z = ' + fmt(texA.z), 'a'), reading('当前观察格', address), reading('射线命中', hitsBlock ? '方块与地板' : '地板'),
         reading('地板深度 · d / 10', fmt(bDepth) + ' / 10 = ' + ztext(sample.groundDepth)),
@@ -5172,7 +5203,8 @@ void main() {
         [reading('B · 世界 → V', tuple(B) + ' → ' + tuple(B.clone().applyMatrix4(V)), 'b'), reading('B · P 投影 → NDC', tuple(B.clone().applyMatrix4(PV))), reading('B · NDC 换到 [0, 1]', tuple(bt), 'b')], '亮框选中 ' + address + '。z = ' + ztext(bt.z) + ' 是 B 自身的深度，下一步用它与这一格的数值比较。']
     ][micro] : undefined);
     const [title, desc, formula] = lesson ?? [stages[step][1], ...descriptions[step]];
-    id('tag').textContent = matrixLesson() ? '补充实验 · 矩阵互转' : stages[step][0];
+    id('tag').textContent = matrixLesson() ? '补充实验 · 矩阵互转' : buildingView() ? '世界 → 灯光 · 构造矩阵'
+      : viewLesson() ? '世界 → 灯光 · 使用矩阵' : stages[step][0];
     id('stage-title').textContent = title;
     id('explain').textContent = desc;
     id('formula').textContent = formula;
@@ -5204,12 +5236,12 @@ void main() {
     }
     updateTrace();
     updateNavigation();
-    id('along').hidden = viewLesson() || projectLesson() || textureLesson();
+    id('along').hidden = frameConstruction() || viewLesson() || projectLesson() || textureLesson();
     id('oblique').textContent = viewLesson() || projectLesson() || textureLesson() ? '恢复讲解视角' : '斜看场景';
-    id('probe-trial').hidden = step !== 0 && step !== 4 && !writing();
+    id('probe-trial').hidden = step !== 4 && !writing();
     id('probe-label').textContent = writing() ? '查看哪一列的写入结果' : '地板点 B 横移';
     id('probe-hint').textContent = writing() ? '整张图按同一个规则写入。滑块切换当前观察的纹素。' : '试试从第 2 列移到第 3 列，比较这两格的深度。';
-    document.querySelector('.legend').hidden = Boolean(lesson);
+    document.querySelector('.legend').hidden = frameConstruction() || Boolean(lesson);
     id('probe-value').textContent = address;
     id('setup-a').textContent = '默认 A = ' + tuple(defaultA) + '，当前 A = ' + tuple(A) + '。';
     id('setup-b').textContent = address + '的近面中心在灯光坐标 (' + fmt(sample.x) + ', ' + fmt(sample.y) + ', 0)，世界坐标 ' + tuple(sample.start) + '。沿 F 前进到世界 Y = 0，得到 B = ' + tuple(B) + '。';
@@ -5232,9 +5264,10 @@ void main() {
     id('micro-status').textContent = (index + 1) + ' / ' + options.length;
     id('matrix-return').hidden = !matrixLesson();
     id('matrix-jump').hidden = matrixLesson();
+    id('inverse-aside').hidden = !viewLesson() || ![viewMatrixSteps.result, viewMatrixSteps.apply].includes(micro);
     id('micro-prev').disabled = (step === 0 || matrixLesson()) && index === 0;
     id('micro-next').disabled = step === 4 && atEnd;
-    id('micro-next').textContent = !atEnd ? '下一步 →' :
+    id('micro-next').textContent = viewLesson() && micro === viewMatrixSteps.result ? '引入 A，试用矩阵 →' : !atEnd ? '下一步 →' :
       matrixLesson() ? '返回主线 →' : step === 4 ? '已到最后一步' : '下一阶段 →';
     id('reading-prev').disabled = id('micro-prev').disabled;
     id('reading-next').disabled = id('micro-next').disabled;
@@ -5500,82 +5533,98 @@ void main() {
   function endOriginDrag(event) {
     if (originDrag?.pointer === event.pointerId) originDrag = undefined;
   }
-  function drawWorldRightProjection(showOrigin) {
-    const worldZero = v(0, 0, 0);
-    const pointProjection = R.dot(A);
-    const originProjection = R.dot(O);
-    const axisEnd = R.clone().multiplyScalar(Math.max(pointProjection, originProjection) + .8);
-    const pointFoot = R.clone().multiplyScalar(pointProjection);
-    arrow(worldZero, axisEnd, axisColors[0], .18, true);
+  function drawWorldAxisReading(axisIndex, showPoint) {
+    const worldZero = v(0, 0, 0), axis = axes[axisIndex];
+    const originProjection = axis.dot(O);
+    const pointProjection = showPoint ? axis.dot(A) : originProjection;
+    const axisEnd = axis.clone().multiplyScalar(Math.max(1, pointProjection, originProjection) + .8);
+    const axisStart = axis.clone().multiplyScalar(Math.min(0, pointProjection, originProjection) - .7);
+    const originFoot = axis.clone().multiplyScalar(originProjection);
+    line(axisStart, worldZero, axisColors[axisIndex], {opacity:.5});
+    arrow(worldZero, axisEnd, axisColors[axisIndex], .18, true);
     pin('W', worldZero);
-    pin('沿 R →', axisEnd);
+    pin(axisNames[axisIndex] + ' →', axisEnd);
+    point(O, 'O · 灯光原点', 0xe2e8e0, '');
+    line(O, originFoot, 0xe2e8e0, {dashed:true, overlay:true});
+    if (!showPoint) {
+      point(originFoot, 'O′ · ' + fmt(originProjection), 0xe2e8e0, 'measure');
+      return;
+    }
+    const pointFoot = axis.clone().multiplyScalar(pointProjection);
     point(A, 'A', colors.a, 'a');
     line(A, pointFoot, colors.a, {dashed:true, overlay:true});
-
-    if (showOrigin) {
-      const originFoot = R.clone().multiplyScalar(originProjection);
-      point(O, 'O', 0xe2e8e0, '');
-      line(O, originFoot, 0xe2e8e0, {dashed:true, overlay:true});
-      if (fmt(lightA.x) === '0') {
-        point(pointFoot, 'A′ = O′', colors.a, 'a');
-        return;
-      }
-      point(originFoot, 'O′', 0xe2e8e0, '');
-      arrow(originFoot, pointFoot, colors.a, .15, true);
+    if (fmt(pointProjection - originProjection) === '0') {
+      point(pointFoot, 'A′ = O′', colors.a, 'a');
+      return;
     }
-    point(pointFoot, 'A′', colors.a, 'a');
+    point(originFoot, 'O′ · ' + fmt(originProjection), 0xe2e8e0, '');
+    arrow(originFoot, pointFoot, colors.a, .15, true);
+    point(pointFoot, 'A′ · ' + fmt(pointProjection), colors.a, 'a');
+  }
+  function drawWorldReference() {
+    const worldZero = v(0, 0, 0);
+    const worldAxes = [[v(2.2, 0, 0), 'X'], [v(0, 2.1, 0), 'Y'], [v(0, 0, 2.05), 'Z']];
+    worldAxes.forEach(([end, name]) => {
+      arrow(worldZero, end, 0x8a9b9c, .15);
+      pin(name, end);
+    });
+    point(worldZero, 'W · 世界原点', 0xb1bfbd, '');
+  }
+  function drawViewConstruction() {
+    const rowIndex = viewMatrixRowSteps.indexOf(micro);
+    if (rowIndex >= 0) {
+      drawWorldAxisReading(rowIndex, false);
+      return;
+    }
+    drawWorldReference();
+    const originLabel = micro === viewMatrixSteps.result ? 'O · 灯光 (0, 0, 0)' : 'O · 灯光原点';
+    point(O, originLabel, 0xe2e8e0, '');
+    if (micro === viewMatrixSteps.direction) {
+      const rawEnd = O.clone().add(lightDirection);
+      line(O, rawEnd, 0xb3d7e9, {dashed:true, overlay:true});
+      pin('(3, −4, 0)', rawEnd);
+    }
+    if (micro === viewMatrixSteps.direction || micro === viewMatrixSteps.backAxis) {
+      const forwardEnd = O.clone().add(F);
+      arrow(O, forwardEnd, colors.ray, .16, true);
+      pin('F · 向前', forwardEnd);
+    }
+    const visibleAxes = micro === viewMatrixSteps.direction ? [] : micro === viewMatrixSteps.backAxis ? [2]
+      : micro === viewMatrixSteps.upAxis ? [1, 2] : [0, 1, 2];
+    visibleAxes.forEach(index => {
+      const end = O.clone().add(axes[index]);
+      arrow(O, end, axisColors[index], .16, true);
+      pin(axisNames[index], end);
+    });
   }
   function drawViewLesson() {
     if (matrixLesson()) {
       drawMatrixLesson();
       return;
     }
-    if (micro === viewMatrixSteps.projectPoint || micro === viewMatrixSteps.changeOrigin) {
-      drawWorldRightProjection(micro === viewMatrixSteps.changeOrigin);
+    if (buildingView()) {
+      drawViewConstruction();
       return;
     }
-    const W = v(0, 0, 0);
-    if (micro < 6) {
-      [[v(2.2, 0, 0), 'X'], [v(0, 2.1, 0), 'Y'], [v(0, 0, 2.05), 'Z']].forEach(([end, name]) => {
-        arrow(W, end, 0x8a9b9c, .15);
-        pin(name, end);
-      });
-      pin('W · 世界原点', W);
+    if (micro === viewMatrixSteps.changeOrigin) {
+      drawWorldAxisReading(0, true);
+      return;
     }
-    if (micro <= 1) {
+    if (micro === viewMatrixSteps.sample || micro === viewMatrixSteps.displacement) {
+      const worldZero = v(0, 0, 0);
+      drawWorldReference();
       drawGround();
       drawBlock();
-      arrow(W, A, 0x8a9b9c, .19, true);
-      arrow(W, O, 0x8a9b9c, .19, true);
+      arrow(worldZero, A, 0x8a9b9c, .19, true);
+      arrow(worldZero, O, 0x8a9b9c, .19, true);
     }
-    point(O, micro === 5 ? 'O · 灯光原点' : 'O', 0xe2e8e0, '');
+    point(O, 'O', 0xe2e8e0, '');
     point(A, 'A', colors.a, 'a');
-    if (micro === 1 || micro >= 6) {
+    if (micro !== viewMatrixSteps.sample && micro !== viewMatrixSteps.apply) {
       arrow(O, A, colors.a, .21, true);
       pin('q = A − O', O.clone().lerp(A, .5), 'q');
     }
-    if (micro >= 2 && micro <= 5) {
-      const fEnd = O.clone().add(F);
-      if (micro === 2) {
-        const rawEnd = O.clone().add(lightDirection);
-        line(O, rawEnd, 0xb3d7e9, {dashed:true, overlay:true});
-        pin('(3, −4, 0)', rawEnd);
-      }
-      if (micro <= 3) {
-        arrow(O, fEnd, colors.ray, .16, true);
-        pin('F · 向前', fEnd);
-      }
-      if (micro >= 3) {
-        const shown = micro === 3 ? [2] : micro === 4 ? [1, 2] : [0, 1, 2];
-        shown.forEach(i => {
-          const end = O.clone().add(axes[i]);
-          arrow(O, end, axisColors[i], .16, true);
-          pin(micro === 5 ? ['R · +xₗ', 'U · +yₗ', 'K · +zₗ'][i] : axisNames[i], end);
-        });
-      }
-    }
-    let active = viewMatrixRowSteps.indexOf(micro);
-    if (micro >= 6 && micro <= 8) active = micro - 6;
+    let active = [viewMatrixSteps.rightProjection, viewMatrixSteps.upProjection, viewMatrixSteps.backProjection].indexOf(micro);
     if (micro === viewMatrixSteps.compare) active = 0;
     if (active >= 0) {
       const axis = axes[active];
@@ -5595,7 +5644,7 @@ void main() {
       const mark = signed(n);
       pin(mark === '0' ? 'H = O · 0' : 'H · ' + mark, foot, 'measure');
     }
-    if (micro === viewMatrixSteps.result) {
+    if (micro === viewMatrixSteps.apply) {
       let begin = O.clone();
       axes.forEach((axis, i) => {
         const amount = lightA.getComponent(i);
@@ -5717,6 +5766,13 @@ void main() {
     textureSurface = null;
     objects = new T.Group();
     scene.add(objects);
+    if (step === 0) {
+      drawWorldReference();
+      point(O, 'O · 灯光原点', 0xe2e8e0, '');
+      line(v(0, 0, 0), O, 0x9baea7, {dashed:true});
+      needsFrame = true;
+      return;
+    }
     if (step === 4 && micro === 0) {
       drawGround();
       drawBlock();
@@ -5766,7 +5822,7 @@ void main() {
       target = v(2.1, 4.2, .2);
       offset = v(2, 12, 11);
       camera.up.set(0, 1, 0);
-    } else if (viewLesson()) {
+    } else if (viewLesson() || step === 0) {
       target = v(1.35, 3.25, 2.2);
       offset = v(9, 5.5, 13);
       camera.up.set(0, 1, 0);
@@ -5797,15 +5853,15 @@ void main() {
     needsFrame = true;
   }
   function positionPins(front) {
-    const spaceLabels = matrixLesson();
-    const placedLabels = spaceLabels ? originHandles.filter(handle => !handle.hidden).map(handle => {
+    const spaceLabels = matrixLesson() || frameConstruction();
+    const placedLabels = matrixLesson() ? originHandles.filter(handle => !handle.hidden).map(handle => {
       const left = handle.offsetLeft - handle.offsetWidth / 2;
       const top = handle.offsetTop - handle.offsetHeight / 2;
       return {left, top, right: left + handle.offsetWidth, bottom: top + handle.offsetHeight};
     }) : [];
-    const isSampleLabel = ({node}) => node.matches('.a,.measure');
+    const isReadingLabel = ({node}) => node.matches('.a,.measure');
     const orderedLabels = spaceLabels
-      ? [...labels.filter(isSampleLabel), ...labels.filter(label => !isSampleLabel(label))]
+      ? [...labels.filter(isReadingLabel), ...labels.filter(label => !isReadingLabel(label))]
       : labels;
     for (const {text, p, node} of orderedLabels) {
       asCameraPoint.copy(p).project(camera);
@@ -5874,11 +5930,11 @@ void main() {
   }
   function showLesson(stage, substep) {
     if (stage === step && substep === micro) return;
-    const enteringMatrix = stage === 1 && substep >= matrixSteps.frames;
+    const enteringMatrix = stage === 1 && substep >= matrixSteps.frames && substep <= matrixSteps.shadow;
     const resetCamera = stage !== step || stage >= 3 || enteringMatrix !== matrixLesson() || (step === 2 && projectLesson() !== (substep < 4));
     step = stage;
     micro = substep;
-    id('matrix-derivation').open = stage === 1 && (substep === viewMatrixSteps.result || substep === matrixSteps.columns);
+    id('matrix-derivation').open = stage === 1 && [viewMatrixSteps.originTarget, viewMatrixSteps.result, viewMatrixSteps.apply, matrixSteps.columns].includes(substep);
     guide();
     rebuild();
     if (resetCamera) {
@@ -5914,7 +5970,7 @@ void main() {
   }
   buttons.forEach((button, index) => button.addEventListener('click', () => {
     if (index === step && !matrixLesson()) return;
-    showLesson(index, 0);
+    showLesson(index, course[index][0][0]);
     scrollBelowTrace();
   }));
   stepSelect.addEventListener('change', () => showLesson(step, Number(stepSelect.value)));
@@ -5958,15 +6014,21 @@ void main() {
     pointX.value = fmt(defaultA.x);
     updatePointPosition();
   });
-  function enterMatrix() {
+  function enterMatrix(entryStep = matrixSteps.frames) {
     matrixReturn = [step, micro];
     matrixColumn = 3;
-    showLesson(1, matrixTrack[0][0]);
+    showLesson(1, entryStep);
     scrollBelowTrace();
     id('micro-next').focus({preventScroll:true});
   }
-  id('matrix-jump').addEventListener('click', enterMatrix);
-  id('matrix-jump-top').addEventListener('click', enterMatrix);
+  id('matrix-jump').addEventListener('click', () => enterMatrix());
+  id('matrix-jump-top').addEventListener('click', () => enterMatrix());
+  id('inverse-jump').addEventListener('click', () => enterMatrix(matrixSteps.columns));
+  id('view-jump').addEventListener('click', () => {
+    showLesson(1, viewMatrixSteps.direction);
+    scrollBelowTrace();
+    id('micro-next').focus({preventScroll: true});
+  });
   originHandles.forEach(handle => {
     handle.addEventListener('pointerdown', beginOriginDrag);
     handle.addEventListener('pointermove', dragOrigin);
