@@ -395,6 +395,7 @@
   const originLegend = [['ink','P · 切线空间原点'], ['sample','OP · 用世界坐标找到 P'], ...frameLegend];
   const matrixLegend = [...frameLegend,['mapped','nWS · 换轴后的法线']];
   const axisChoices = {key:'axis', label:'看哪根世界轴', options:['世界 X','世界 Y','世界 Z']};
+  const localAxisChoices = {key:'localAxis', label:'沿哪根局部轴读数', options:['T 行','B 行','N 行']};
   const positionLegend = [['t','Q0、Q1、Q2 · 网格顶点'],['ink','白点 P · 正在着色的玻璃位置']];
   const steps = {
     basis: {
@@ -458,19 +459,30 @@
       caption:'从 O 量到 P，再把这一轴的零点移到 P',
       flatHint:'青箭头连着世界原点 O 和玻璃点 P。彩色尺与 P 上选中的轴平行，暂时从 O 起量。虚线把 P 投到尺上。',
       spaceHint:'看白点 P 到彩色尺的虚线。尺从 O 起量，图上箭头标出 P 在这一轴上的带符号读数。',
-      try:'依次点 T、B、N 行。对照彩色尺上的读数和高亮的第四格，它们相加等于 0。',
+      try:'依次点 T、B、N 行。先验算 P 的读数怎样归零，再点「下一步」用试算点 A 看相减的意义。',
       more:'为什么末尾补 1？', legend:originLegend, controls:['turn'],
-      choices:{key:'localAxis', label:'沿哪根局部轴读数', options:['T 行','B 行','N 行']}
+      choices:localAxisChoices
+    },
+    'tangent-point': {
+      name:'从 P 量到 A', title:'为什么 Eᵀ pWS 要减 Eᵀ P？',
+      purpose:'灰点 O 是世界原点，白点 P 是切线空间的原点。紫点 A 是这次要换算的点。pWS 是 A 的世界坐标，pTS 是从 P 沿 T、B、N 量出的 A 的坐标。',
+      caption:'在过 O 和过 P 的两把平行尺上量同一段位移',
+      flatHint:'过 O 的尺上，青段连接 P 和 A 的投影。过 P 的尺上，同一段从零刻度 P 起量。',
+      spaceHint:'过 O 的尺上，青段连接 P 和 A 的投影。过 P 的尺上，同一段从零刻度 P 起量。',
+      try:'切换 T、B、N 行。每次都在过 O 的尺上找两个刻度，用 A 刻度减 P 刻度。',
+      more:'为什么能把减法移到括号里？',
+      legend:[['ink','白点 P · 切线原点'],['view','紫点 A · 试算点'],['sample','青箭头 · P→A 与轴上的分量']],
+      controls:['turn'], choices:localAxisChoices, space:true
     },
     'tangent-to-world': {
       name:'求逆回世界', title:'用 E 和 P，把切线坐标换回世界坐标',
-      purpose:'沿用上一页的 E = [T B N]，三列分别是蓝 T、黄 B、绿 N 的世界方向。pTS 和 pWS 是同一个点的切线坐标和世界坐标。现在反过来，由 pTS 求 pWS。',
-      caption:'局部 (0, 0, 0) 对应白点 P 的世界位置',
-      flatHint:'彩色 T、B、N 从白点 P 出发。青色 OP 从世界原点走到 P，对应反向矩阵第四列的前三个数。',
-      spaceHint:'白点 P 上的 T、B、N 是前三列。青色 OP 对应第四列，把局部零点放回世界里的 P。',
-      try:'点「对照 −45°」，看前三列随玻璃一起转。玻璃绕 P 转，第四列 P 保持原值。',
+      purpose:'上一页把紫点 A 的世界坐标 pWS 换成了切线坐标 pTS。这一步拿同一个 pTS 乘逆矩阵，还原图上的同一个紫点 A。',
+      caption:'从世界原点找到 P，再走回紫点 A',
+      flatHint:'青色 OP 对应第四列 P。从白点 P 沿蓝、黄、绿三段走到 A，每段由对应的列乘 pTS 的一项得到。',
+      spaceHint:'青色 OP 对应第四列 P。从白点 P 沿蓝、黄、绿三段走到 A，每段由对应的列乘 pTS 的一项得到。',
+      try:'点「对照 −45°」。观察 pTS 和三段走法怎样改变，最后仍到达同一个 A。',
       more:'展开求逆的理由和矩阵细节', detailButton:'看单位试走与 Shader 打包 →',
-      legend:originLegend, controls:['turn']
+      legend:[...originLegend,['view','A · 换算回来的试算点']], controls:['turn'], space:true
     },
     matrix: {
       name:'三根轴放三列', title:'T、B、N 三列各记录哪一步？',
@@ -604,9 +616,9 @@
       source:100, legend:[['sample','背景图取色'],['ray','Cubemap 取色'],['mapped','P 输出位置']], controls:['amount']
     }
   };
-  const { measure, normalLegs, number, tuple, cssColor, pixel, originUV, bumpUV, faces, coordinateSteps } = GlassLab;
+  const { measure, normalLegs, tangentPointExample, number, tuple, cssColor, pixel, originUV, bumpUV, faces, coordinateSteps } = GlassLab;
   const sections = {
-    basis:['basis','sample','decode','decode-foot','decode-z','frame','world-to-tangent','tangent-to-world','dot','normal-result'],
+    basis:['basis','sample','decode','decode-foot','decode-z','frame','world-to-tangent','tangent-point','tangent-to-world','dot','normal-result'],
     refraction:['refraction'],
     reflection:['reflection','view','bounce'],
     mix:['mix']
@@ -939,6 +951,7 @@
     const librarySource = step === 'decode-z';
     const shadowLink = {
       'world-to-tangent': ['世界 → 灯光 ↗', 'view-first-row'],
+      'tangent-point': ['同一刻度上相减 ↗', 'same-right-axis-scale'],
       'tangent-to-world': ['灯光 → 世界 ↗', 'light-to-world-use']
     }[step];
     const sourceLink = byId('source-link');
@@ -1099,18 +1112,54 @@
           `${reading} + 第四格 = 0　→　第四格 ≈ ${offset}`
         ], '和 Shadow 一样，把点 P 的输入写成四个数，末尾补 1。第四格乘 1 后加进这一行。P 是切线空间的原点，所以三行各自加上能把 P 的读数抵消的数。'],
         ['组装并用 P 验算', [
-          `EᵀP ≈ ${tuple(fourthColumn.map(value => -value), 4)}，第四列前三格 −EᵀP ≈ ${tuple(fourthColumn, 4)}`,
-          '世界 → 切线　pTS = Eᵀ pWS − Eᵀ P = Eᵀ(pWS − P)',
-          `验算　P ${vecText(worldPos)} → Eᵀ(P − P) = (0, 0, 0)，w 仍为 1`
-        ], '上式中的 pWS 和 pTS 是同一个点的世界和切线坐标。括号里的 pWS − P 是从新原点 P 指向这个点的位移，再沿三根局部轴读数。']
+          `Eᵀ P = (T · P, B · P, N · P) ≈ ${tuple(fourthColumn.map(value => -value), 4)}`,
+          `第四列前三格 −Eᵀ P ≈ ${tuple(fourthColumn, 4)}`,
+          '输入 P　→　Eᵀ P + (−Eᵀ P) = (0, 0, 0)，w 仍为 1'
+        ], 'Eᵀ 的三行分别沿 T、B、N 读白点 P，三次都从世界原点 O 起量。加上第四列后，这三个读数归零。矩阵已经组好。下一步代入一个紫点 A，看同样的减法在图上量出了哪一段。']
       ], [
         ['末尾的 1', '点的坐标 (X, Y, Z, 1)',
           '前三行用末尾的 1 把自己的第四格加一次。最后一行 (0, 0, 0, 1) 输出这个 1。']
       ]);
-    } else if (step === 'tangent-to-world') {
+    } else if (step === 'tangent-point') {
+      const localAxis = focus.localAxis;
+      const name = 'TBN'[localAxis];
+      const {targetWS, targetReadings, originReadings, deltaWS, deltaTS} = tangentPointExample(data);
+      const targetTick = number(targetReadings[localAxis], 4);
+      const pointTick = number(originReadings[localAxis], 4);
+      const deltaTick = number(deltaTS[localAxis], 4);
+      const direction = data.worldToTangent[localAxis].slice(0, 3);
       pictureValues([
-        ['白点 P · 从局部原点起量', '(0, 0, 0, 1)'],
-        ['青色 OP · 从世界原点起量', tuple([...worldPos, 1], 4), 'sample']
+        [`过 O 的尺 · P 的 ${name} 刻度`, pointTick],
+        [`过 O 的尺 · A 的 ${name} 刻度`, targetTick, 'view'],
+        [`过 P 的尺 · A 的 ${name} 读数`, deltaTick, 'sample']
+      ]);
+      lesson([
+        ['用同一把过 O 的尺读 A 和 P', [
+          `A 的 ${name} 刻度 = ${name} · pWS = ${name} · ${vecText(targetWS)} ≈ ${targetTick}`,
+          `P 的 ${name} 刻度 = ${name} · P = ${name} · ${vecText(worldPos)} ≈ ${pointTick}`,
+          `Eᵀ pWS ≈ ${tuple(targetReadings, 4)}，沿 T、B、N 读 OA`,
+          `Eᵀ P ≈ ${tuple(originReadings, 4)}，沿 T、B、N 读 OP`
+        ], `Eᵀ 的上标 ᵀ 表示转置，把 E 的 T、B、N 三列排成三行。选中 ${name} 行时，用 ${name} 的世界方向 ${tuple(direction, 4)} 分别和 A、P 的世界坐标点积。图上沿紫色 OA 和白色 OP 看，两条虚线在过 O 的尺上落下两个刻度。两者的零点都是 O。`],
+        ['用 A 的刻度减 P 的刻度，得到从 P 起量的读数', [
+          `沿 ${name}　A 刻度 − P 刻度 = ${targetTick} − (${pointTick}) ≈ ${deltaTick}`,
+          `三根轴各减一次　pTS = Eᵀ pWS − Eᵀ P ≈ ${tuple(deltaTS, 4)}`
+        ], `过 O 的尺上，A 的刻度是从 0 数出来的。要从 P 起量，就从 P 的刻度数到 A 的刻度，得到图上的青段。把尺的零点移到 P，青段的带符号读数仍是 ${deltaTick}。三个这样的读数组成 A 的切线坐标。`],
+        ['也可以先画 P→A，再沿三根轴读数', [
+          `pWS − P = ${vecText(targetWS)} − ${vecText(worldPos)} = ${vecText(deltaWS)}`,
+          `${name} · (pWS − P) ≈ ${tuple(direction, 4)} · ${vecText(deltaWS)} ≈ ${deltaTick}`,
+          `pTS = Eᵀ(pWS − P) = Eᵀ pWS − Eᵀ P ≈ ${tuple(deltaTS, 4)}`
+        ], '连接白点 P 和紫点 A 的青箭头是整段世界位移。把这段位移投到过 P 的尺上，得到同一个读数。上一步的第四列 −Eᵀ P 正是把这次换零点的减法存进了矩阵。']
+      ], [
+        ['按一行看分配律', `${name} · pWS − ${name} · P = ${name} · (pWS − P)`,
+          '两次点积用的是同一行系数。世界 X、Y、Z 各自先相减再乘系数，与先乘系数再相减的结果相同。把三行合起来，就是两个矩阵写法的等式。']
+      ]);
+    } else if (step === 'tangent-to-world') {
+      const {deltaTS, inverseLegs} = tangentPointExample(data);
+      const recoveredPoint = inverseLegs.at(-1).to;
+      pictureValues([
+        ['白点 P · 世界位置', vecText(worldPos), 'sample'],
+        ['紫点 A · 输入 pTS', tuple(deltaTS, 4), 'view'],
+        ['紫点 A · 输出 pWS', vecText(recoveredPoint), 'view']
       ]);
       lesson([
         ['由 pTS 求 pWS', [
@@ -1126,7 +1175,13 @@
         ['用白点 P 验算', [
           '输入局部原点 (0, 0, 0, 1)',
           `E × (0, 0, 0) + P = P　→　输出 ${tuple([...worldPos, 1], 4)}`
-        ], '前三列各乘 0，第四列乘 1，结果是图上白点的世界坐标。用同一张表换算箭头时，要看箭头尖 Q 与白点 P 相差多少。']
+        ], '前三列各乘 0，第四列乘 1，结果是图上白点的世界坐标。'],
+        ['代回上一页的 pTS，走到同一个紫点 A', [
+          `输入 A 的切线坐标 pTS ≈ ${tuple(deltaTS, 4)}`,
+          ...inverseLegs.map(({weight, delta}, index) =>
+            `${'TBN'[index]} × (${number(weight, 4)}) ≈ ${tuple(delta, 4)}`),
+          `三段位移相加再加 P，得到 A 的世界坐标 pWS ≈ ${vecText(recoveredPoint)}`
+        ], '从白点 P 依次走图中的蓝、黄、绿三段，终点就是紫点 A。下一步换算 bump 时，仍用 E 算彩色位移。']
       ], [
         ['为什么 E Eᵀ 是单位矩阵', 'EᵀE = I　→　Eᵀ 是 E 的逆　→　E Eᵀ = I',
           'EᵀE 的每一格是两根列向量的点积。同轴时为 1，异轴时为 0，得到单位矩阵 I。E 是方阵，所以 Eᵀ 与 E 两种顺序相乘都得到 I。'],
@@ -1758,6 +1813,9 @@
       } else if (step==='mix') {
         orbit.target.copy(anchor).addScaledVector(vec(...data.viewDir),-.48);
         viewCamera.position.copy(anchor).add(vec(-5.2,2.4,3.75));
+      } else if (step==='tangent-point' || step==='tangent-to-world') {
+        orbit.target.copy(anchor).add(vec(.05,-.1,.45));
+        viewCamera.position.copy(orbit.target).add(vec(-4.6,3.6,6.9));
       } else if (step==='dot') {
         orbit.target.copy(anchor).add(vec(-.12,.08,.12));
         viewCamera.position.copy(anchor).add(vec(-1.42,1.46,4.53));

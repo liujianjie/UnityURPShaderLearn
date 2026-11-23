@@ -56,6 +56,8 @@ $$
 
 左上角的转置把三根轴从列转到行。右上角的第四列前三项是 `−R · O`、`−U · O`、`−K · O`，分别减去原点沿三根轴的读数。
 
+以右轴为例，`R · p_world` 和 `R · O` 是同一把过世界原点、沿 `R` 方向的尺上的两个投影刻度。用前者减后者，得到从 `O` 的刻度走到目标点刻度的带符号距离。把同方向的尺放到 `O`，从它的零刻度读到的就是这个差。也可先用 `p_world − O` 得到从 `O` 出发的世界位移，再用 `R · (p_world − O)` 读这个距离。[在玻璃图解上对照两把平行尺](Chapter10-GlassRefraction-3D.html#tangent-point)
+
 带数值的例子：[第 9 章灯光视图矩阵](Chapter09-Shadow-QA.md#light-matrix-walkthrough)。
 
 <a id="axis-projection-right-angle"></a>

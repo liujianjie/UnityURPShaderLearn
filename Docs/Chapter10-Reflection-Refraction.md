@@ -101,6 +101,8 @@ half3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
 
 本章用的是 Shadow 篇「灯光 → 世界」这个方向的同一种变换。以当前片元 `P` 作为切线空间原点，从「世界 → 切线」求逆后，上三行的前三列是 `T、B、N`，第四列前三格是 `P`。第 92 行换的是法线方向，所以取三行的 `.xyz`。第 78 行取 `.w` 拼出单独的位置。[用同一个 P 看正向、反向与点积](Chapter10-GlassRefraction-3D.html#world-to-tangent)
 
+试算点 `A` 的世界坐标 `(2, 2, 3)` 在玻璃转到 `−90°` 时换成切线坐标 `(2, 1, −1)`。代回 `pWS = E pTS + P`，从 `P = (1, 1, 1)` 沿 `T、B、N` 分别走 `2、1、−1` 格，就走回同一个紫点 `A`。[在三维图上验算](Chapter10-GlassRefraction-3D.html#tangent-to-world)
+
 矩阵的三列各记录一次以 `P` 为起点的试走。玻璃绕世界 Y 转 `−90°` 时，`T` 从 `+X` 转到 `+Z`，`B` 与转轴同向，仍沿 `+Y`，`N` 从 `+Z` 转到 `−X`。从 `P = (1, 1, 1)` 单独沿 `B` 走一格到 `(1, 2, 1)`，终点减 `P` 得到第二列 `(0, 1, 0)`。单独沿 `N` 走一格到 `(0, 1, 1)`，得到第三列 `(−1, 0, 0)`。沿 `T` 走一格的局部输入是 `(1, 0, 0)`，因此本次把第一列乘 `1`，把第二、三列乘 `0`。[点表头试走这三步](Chapter10-GlassRefraction-3D.html#matrix)
 
 Shader 第 72～74 行按行存这张表。把三列各乘旧 `bump` 的一个分量，得到三段已经用世界坐标表示的位移。只取每段的 X 相加，就是第 92 行的 `dot(i.TtoW0.xyz, bump)`，Y、Z 同理。图解用旋转 `−45°`、法线倾角 `+30°` 演示 X 上的折返。蓝段在 X 尺上走 `+0.28284`，黄段走 `0`，绿段走 `−0.61237`，合计 `−0.32953`。[看世界轴上的逐行点积](Chapter10-GlassRefraction-3D.html#dot) · [从点的换算推导位移的换算](Graphics-Fundamentals.md#tangent-frame)

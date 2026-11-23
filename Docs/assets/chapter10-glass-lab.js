@@ -8,7 +8,7 @@ const GlassLab = (() => {
   const worldAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
   const positionSteps = ['vertex-pos', 'pack-pos', 'interp-pos', 'read-pos'];
   const transformSteps = ['world-to-tangent', 'tangent-to-world'];
-  const coordinateSteps = ['frame', 'decode', ...transformSteps, 'matrix', 'combine', 'rows', 'dot', 'normal-result', 'reflection', ...positionSteps, 'view'];
+  const coordinateSteps = ['frame', 'decode', ...transformSteps, 'tangent-point', 'matrix', 'combine', 'rows', 'dot', 'normal-result', 'reflection', ...positionSteps, 'view'];
   const seam = 160;
   const brick = { name: '砖红墙', rgb: [.46, .112, .064] };
   const blue = { name: '蓝墙', rgb: [.047, .226, .37] };
@@ -79,16 +79,30 @@ const GlassLab = (() => {
       offsetPx, offsetUV, samplePx, uv, wall, refrCol: wall.rgb, reflCol, finalCol };
   }
 
-  function normalLegs(data) {
+  function tangentLegs(data, weights) {
     let from = data.worldPos;
     return [data.tangent, data.bitangent, data.normal].map((direction, index) => {
-      const weight = data.ts[index];
+      const weight = weights[index];
       const delta = direction.map(value => value * weight);
       const to = addScaled(from, delta);
       const leg = {from, to, delta, weight};
       from = to;
       return leg;
     });
+  }
+
+  function normalLegs(data) {
+    return tangentLegs(data, data.ts);
+  }
+
+  function tangentPointExample(data) {
+    const targetWS = [2, 2, 3];
+    const targetReadings = data.worldToTangent.map(row => dot(row.slice(0, 3), targetWS));
+    const originReadings = data.worldToTangent.map(row => -row[3]);
+    const deltaWS = addScaled(targetWS, data.worldPos, -1);
+    const deltaTS = targetReadings.map((value, index) => value - originReadings[index]);
+    const inverseLegs = tangentLegs(data, deltaTS);
+    return {targetWS, targetReadings, originReadings, deltaWS, deltaTS, inverseLegs};
   }
 
   function coordinateSketch(step, data, focus) {
@@ -143,7 +157,7 @@ const GlassLab = (() => {
       return visibleLegs.at(-1).to;
     }
 
-    if (!['basis', 'decode', 'combine', 'dot', 'view', 'bounce'].includes(step)) {
+    if (!['basis', 'decode', 'combine', 'dot', 'view', 'bounce', 'tangent-point'].includes(step)) {
       if (step !== 'reflection') axesAt(origin, ['pack-pos', 'read-pos', 'rows'].includes(step) ? axis : -1);
       mark(origin, 'muted');
       label('O', origin, 'muted', -20, 7);
@@ -201,12 +215,12 @@ const GlassLab = (() => {
     } else if (transformSteps.includes(step)) {
       arrow(origin, point, 'sample', .018);
       label('OP', addScaled(origin, point, .5), 'sample', -28, -14);
-      localAxes.forEach(([direction, name, color], index) => {
-        const end = addScaled(point, direction, .78);
-        arrow(point, end, color, step === 'world-to-tangent' && index === localAxis ? .026 : .015);
-        label(name, end, color);
-      });
       if (step === 'world-to-tangent') {
+        localAxes.forEach(([direction, name, color], index) => {
+          const end = addScaled(point, direction, .78);
+          arrow(point, end, color, index === localAxis ? .026 : .015);
+          label(name, end, color);
+        });
         const [direction, name, color] = localAxes[localAxis];
         const reading = -data.worldToTangent[localAxis][3];
         const foot = addScaled(origin, direction, reading);
@@ -220,7 +234,52 @@ const GlassLab = (() => {
           mark(foot, color);
           label(`${name}·P = ${number(reading, 3)}`, foot, color, 8, 13);
         }
+      } else {
+        const {inverseLegs} = tangentPointExample(data);
+        inverseLegs.forEach(({from, to, delta, weight}, index) => {
+          if (Math.abs(weight) <= .025) return;
+          const [, name, color] = localAxes[index];
+          arrow(from, to, color, .023);
+          label(`${name} × ${number(weight, 4)}`, addScaled(from, delta, .5), color, 7, 10);
+        });
+        const recoveredPoint = inverseLegs.at(-1).to;
+        mark(recoveredPoint, 'view');
+        label('A · 试算点', recoveredPoint, 'view', 8, -25);
       }
+    } else if (step === 'tangent-point') {
+      const [direction, name, color] = localAxes[localAxis];
+      const {targetWS, targetReadings, originReadings, deltaTS} = tangentPointExample(data);
+      const pointTick = originReadings[localAxis], targetTick = targetReadings[localAxis], deltaTick = deltaTS[localAxis];
+      const pointFoot = addScaled(origin, direction, pointTick);
+      const targetFoot = addScaled(origin, direction, targetTick);
+      const localFoot = addScaled(point, direction, deltaTick);
+
+      const worldRailEnd = addScaled(origin, direction, Math.max(.8, pointTick, targetTick) + .28);
+      const localRailEnd = addScaled(point, direction, Math.max(.8, deltaTick) + .28);
+      arrow(addScaled(origin, direction, Math.min(0, pointTick, targetTick) - .18), worldRailEnd, color, .009);
+      arrow(addScaled(point, direction, Math.min(0, deltaTick) - .18), localRailEnd, color, .009);
+      label(`+${name} · 过 O`, worldRailEnd, color, 8, 10);
+      label(`+${name} · 过 P`, localRailEnd, color, 8, -20);
+
+      arrow(origin, point, 'ink', .012);
+      arrow(origin, targetWS, 'view', .013);
+      arrow(point, targetWS, 'sample', .019);
+      line([point, pointFoot], 'ink', true);
+      line([targetWS, targetFoot], 'view', true);
+      line([targetWS, localFoot], 'sample', true);
+      arrow(pointFoot, targetFoot, 'sample', .020);
+      arrow(point, localFoot, 'sample', .020);
+
+      mark(origin, 'muted');
+      mark(pointFoot);
+      mark(targetFoot, 'view');
+      mark(localFoot, 'sample');
+      mark(targetWS, 'view');
+      label('O · 0', origin, 'muted', -28, 9);
+      label('A · 试算点', targetWS, 'view', 8, -25);
+      label(`P 刻度 ${number(pointTick, 4)}`, pointFoot, 'ink', -14, 16);
+      label(`A 刻度 ${number(targetTick, 4)}`, targetFoot, 'view', 8, -21);
+      label(`从 P 量 ${name} = ${number(deltaTick, 4)}`, localFoot, 'sample', 8, 10);
     } else if (step === 'matrix') {
       const [direction, name, color] = localAxes[column];
       localAxes.forEach(([ruler, axisName, axisColor], index) => {
@@ -312,7 +371,7 @@ const GlassLab = (() => {
       }
     }
     mark(point);
-    const startName = step === 'vertex-pos' ? 'P · 玻璃原点' :
+    const startName = step === 'vertex-pos' ? 'P · 玻璃原点' : step === 'tangent-point' ? 'P · 0' :
       step === 'dot' && data.tilt === 0 ? 'P = P1 = P2' : pointName;
     label(startName, point, 'ink', -19, 8);
     return {strokes, labels, markers};
@@ -678,5 +737,5 @@ const GlassLab = (() => {
   }
 
   return { size, pixel, originUV, bumpUV, seam, brick, blue, faces, pivot, verticesOS,
-    coordinateSteps, coordinateSketch, measure, normalLegs, diagram, number, tuple, cssColor };
+    coordinateSteps, coordinateSketch, measure, normalLegs, tangentPointExample, diagram, number, tuple, cssColor };
 })();
