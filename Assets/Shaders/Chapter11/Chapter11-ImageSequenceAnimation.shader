@@ -4,32 +4,38 @@ Shader "Unity Shaders Book/Chapter 11/Image Sequence Animation"
     {
         _Color ("Color Tint", Color) = (1,1,1,1)
         _MainTex ("Image Sequence", 2D) = "white" {}
-        _HorizontalAmount("Horizontal Amount", Float) = 4
-        _VerticalAmount("Vertical Amount", Float) = 4
-        _Speed ("Speed", Range(1,100)) = 30
+        _HorizontalAmount("Horizontal Amount", Float) = 4 
+        _VerticalAmount("Vertical Amount", Float) = 4  //序列帧纹理的行列数
+        _Speed ("Speed", Range(1,100)) = 30//动画速度
     }
     SubShader
     {
-        Tags { "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
-
+        Tags { "RenderPipeline" = "UniversalPipeline" "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
+            //序列帧图像通常是透明纹理
+            //如果提供了 IgnoreProjector 标签并且值为“True”，则使用此着色器的对象不会受到投影器的影响。这对半透明对象非常有用，因为投影器无法影响它们。
         Pass{
-            Tags{"LightMode" = "ForwardBase"}
+            Tags{"LightMode" = "UniversalForward"}
 
             ZWrite Off
-            Blend SrcAlpha OneMinusSrcAlpha
-
-            CGPROGRAM
+            Blend SrcAlpha OneMinusSrcAlpha         //透明物体基本设置，关闭深度写入，开启混合模式
+            
+            HLSLPROGRAM
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             #pragma vertex vert
             #pragma fragment frag
-
-            #include "UnityCG.cginc"
-            fixed4 _Color;
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
-            float _HorizontalAmount;
-            float _VerticalAmount;
-            float _Speed;
+            
+            CBUFFER_START(UnityPerMaterial)
+                half4 _Color;
+                float4 _MainTex_ST;
+                float _HorizontalAmount;
+                float _VerticalAmount;
+                float _Speed;
+            CBUFFER_END
+            
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
             struct a2v{
                float4 vertex: POSITION;
@@ -43,26 +49,26 @@ Shader "Unity Shaders Book/Chapter 11/Image Sequence Animation"
 
             v2f vert(a2v v){
                 v2f o;
-                o.pos = UnityObjectToClipPos(v.vertex);
-                o.uv = TRANSFORM_TEX(v.texcoord, _MainTex);
+                o.pos = TransformObjectToHClip(v.vertex);
+                o.uv = TRANSFORM_TEX(v.texcoord, _MainTex);//TRANSFORM_TEX方法比较简单，就是将模型顶点的uv和Tilingffset两个变量进行运算，计算出、O实际显示用的定点uv。
                 return o;
              }
-             fixed4 frag(v2f i):SV_Target{
-                 float time = floor(_Time.y * _Speed);
-                 float row = floor(time / _HorizontalAmount);
+             half4 frag(v2f i):SV_Target{
+                 float time = floor(_Time.y * _Speed);      //_Time（float4） 是自该场景加载开始所经过的时间，四个分量的值分别是（t/20,t,2t,3t）
+                 float row = floor(time / _HorizontalAmount); //函数floor 为向下取整
                  float column = time - row * _HorizontalAmount;
                  
-                 half2 uv = i.uv + half2(column, -row);
+                 half2 uv = i.uv + half2(column, -row);  //大概是因为URP底层使用的是DX，所以row取负会出现问题  不能写-row
                  uv.x /= _HorizontalAmount;
                  uv.y /= _VerticalAmount;
 
-                 fixed4 c = tex2D(_MainTex, uv);
+                 half4 c = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);// 贴图采样方法有变化，由tex2D(Tex, texcoords)变为SAMPLE_TEXTURE2D(textureName, samplerName, texcoord)
                  c.rgb *= _Color;
 
                  return c;
              }
-            ENDCG
+            ENDHLSL
          }
     }
-	FallBack "Transparent/VertexLit"
+    FallBack "Packages/com.unity.render-pipelines.universal/FallbackError"
 }

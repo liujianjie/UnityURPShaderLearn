@@ -331,12 +331,18 @@ const GlassLab = (() => {
       arrow(point, projectedTip, 'sample', .022);
       label(`${'XYZ'[axis]} = ${number(rawWS[axis], 5)}`, projectedTip, 'sample', 6, 11);
     } else if (step === 'normal-result') {
+      const before = reading === 0;
       const tip = addScaled(point, data.ws);
-      if (reading === 0) composeNormal(true);
-      else worldRoute(point, data.ws, 'sample');
+      label(before ? 'Q · 旧 bump 箭头尖' : 'Q · 新 bump 箭头尖', tip, 'mapped', 9, 16);
+      if (before) {
+        composeNormal(true);
+      } else {
+        worldRoute(point, data.ws, 'sample');
+        line([origin, tip], 'muted', true);
+        label('O → Q · 世界位置', addScaled(origin, tip, .5), 'muted', 9, 12);
+      }
       arrow(point, tip, 'mapped', .028);
       mark(tip, 'mapped');
-      label('bump', tip, 'mapped', 9, -23);
     } else {
       if (step === 'rows') {
         const direction = worldAxes[axis];

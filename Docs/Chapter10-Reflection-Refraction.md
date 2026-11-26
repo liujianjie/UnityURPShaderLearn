@@ -107,9 +107,13 @@ half3 color = ambient + lerp(diffuse, reflection, saturate(fresnel)) * atten;
 
 Shader 第 72～74 行按行存这张表。把三列各乘旧 `bump` 的一个分量，得到三段已经用世界坐标表示的位移。只取每段的 X 相加，就是第 92 行的 `dot(i.TtoW0.xyz, bump)`，Y、Z 同理。图解用旋转 `−45°`、法线倾角 `+30°` 演示 X 上的折返。蓝段在 X 尺上走 `+0.28284`，黄段走 `0`，绿段走 `−0.61237`，合计 `−0.32953`。[看世界轴上的逐行点积](Chapter10-GlassRefraction-3D.html#dot) · [从点的换算推导位移的换算](Graphics-Fundamentals.md#tangent-frame)
 
-玻璃绕世界 Y 转 `−90°` 时，第 92 行右侧读入旧的 `bump = (0.4, 0.3, 0.866…)`，沿 `T、B、N` 量。第一行 `(0, 0, −1)` 与它点乘得 `−0.866…`，另两行得到 `0.3` 和 `0.4`。`normalize` 统一单位长度后，等号把这组三轴读数写回 `bump`。沿世界 `X、Y、Z` 用新读数走，和沿 `T、B、N` 用旧读数走，在本平面算例里到达同一个粉色箭头尖。[切换 bump 的两种读法](Chapter10-GlassRefraction-3D.html#normal-result)
+玻璃绕世界 Y 转 `−90°` 时，旧 `bump ≈ (0.4, 0.3, 0.866)` 的 `.x = 0.4` 表示沿 `T` 走 `0.4` 格。此时 `T` 朝世界 `+Z`，所以蓝段用世界坐标写是 `(0, 0, 0.4)`。黄段沿 `B` 朝世界 `+Y`，是 `(0, 0.3, 0)`。绿段沿 `N` 朝世界 `−X`，约为 `(−0.866, 0, 0)`。第 92 行的三个点积把三段的世界分量按轴分别相加，得到约 `(−0.866, 0.3, 0.4)`。本例的三根切线轴互相垂直且长度都是 1，换轴前后的法线长度都是 1，归一化后仍是同一支箭头。
+
+Shader 在玻璃片元 `P` 取样得到法线，网页把箭尾画在 `P`，用 `Q = P + bump` 算箭头尖。切线坐标以 `P` 为原点，所以旧 `bump` 的三个分量也是 `Q` 的切线坐标。用世界坐标表示时，粉箭头 `P → Q` 的位移是 `Q − P`，这就是新 `bump`。从世界原点 `O` 先走到 `P = (1, 1, 1)`，再加上新 `bump`，得到 `O → Q`，也就是 `Q` 的世界位置。把倾角改为 `0°`，玻璃仍转 `−90°`，法线 `bump = (−1, 0, 0)` 只沿世界 `−X`，而箭头尖 `Q = (0, 1, 1)` 从 `O` 看要沿 `+Y`、`+Z` 各走一格。在「执行后」用灰虚线和粉箭头对照这两个方向。[切换 bump 的两种读法](Chapter10-GlassRefraction-3D.html#normal-result)
 
 每份 `TtoW` 是四格数据。顶点先用 `positionWS` 得到当前蓝点的世界位置，再把 X、Y、Z 依次写进三个 `.w`。例如 `Q0`、`Q1`、`Q2` 的世界 Y 分别是 `0.6`、`0.6`、`1.8`，各写入自身的 `o.TtoW1.w`。图中的白点 `P` 是三角形重心，`i.TtoW1.w` 经等权插值得到 `(0.6 + 0.6 + 1.8) / 3 = 1`。第 78 行依次取三份插值结果的 `.w`，得到 `P = (1, 1, 1)`，也就是从场景原点沿世界 X、Y、Z 各走一格到白点的位置。[图上的 P](Chapter10-GlassRefraction-3D.html#reflection) · [看对应字段怎样插值](Chapter10-GlassRefraction-3D.html#interp-pos)
+
+第 92 行的 `dot` 取 `TtoW0/1/2.xyz`，所以新 `bump` 只有法线在世界轴上的三个分量。第 93 行把这支方向传给 `reflect`。如果玻璃只平移，方向保持原样，`P` 和图上的 `Q` 一起移动。此时 `Q − P` 保持原样，`O → Q` 则随物体的位置改变。[对照 .xyz 和箭头尖的位置](Chapter10-GlassRefraction-3D.html#normal-result)
 
 相机点 `C = (−2, 1, 5)`。用 `C − P = (−3, 0, 4)` 得到白虚线 `P → C` 的整段位移。三个分量除以长度 `5` 得到紫色单位箭头 `worldViewDir = (−0.6, 0, 0.8)`。取负后，箭头朝向 P，作为 `reflect` 的入射方向。[白虚线和紫箭头的对照](Chapter10-GlassRefraction-3D.html#view) · [从反射方向取倒影](Chapter10-GlassRefraction-3D.html#bounce)
 

@@ -524,12 +524,12 @@
     },
     'normal-result': {
       name:'bump 前后对照', title:'第 92 行前后，bump 的三个数分别怎么量？',
-      purpose:'用旧 bump 沿 T、B、N 走，再用新 bump 沿世界 X、Y、Z 走，对照两种读法画出的箭头。',
-      caption:'两套轴、同一支粉箭头',
-      flatHint:'切换量法，找两条路线共同的起点 P 和粉色终点。',
-      spaceHint:'切换量法，对照两条分段路线怎样从 P 到达同一个粉色箭头尖。',
-      try:'切换「执行前」「执行后」。再点「平整 0°」，看旧 bump 只沿 N 走 1 格时，新的 bump 沿哪根世界轴。',
-      more:'为什么换完轴还要调用 normalize？', source:92, legend:[...frameLegend,['mapped','粉箭头 · P 处法线'],['sample','沿世界轴的分段']], controls:['tilt','turn'], space:true,
+      purpose:'先找从白点 P 指到粉色点 Q 的直箭头。旧 bump 和新 bump 都表示这支箭头，三个数分别沿不同的轴量。',
+      caption:'粉色直箭头 P → Q 就是 bump',
+      flatHint:'蓝、黄、绿折线读出旧 bump 的 T、B、N 分量，青色折线读出新 bump 的 X、Y、Z 分量。执行后的灰虚线从 O 连到 Q。',
+      spaceHint:'执行后对照两条线。粉箭头从白点 P 出发，画的是 P 处的法线；灰虚线从世界原点 O 出发，连到 Q 的世界位置。',
+      try:'点「算例 −90°」「平整 0°」「执行后」。粉箭头只沿世界 −X 走，灰虚线沿 Y、Z 方向斜着连到 Q。拖动三维图，对照两条线的朝向。',
+      more:'为什么换完轴还要调用 normalize？', source:92, legend:[...frameLegend,['mapped','粉色直箭头 · bump'],['sample','沿世界轴的分段'],['muted','执行后灰虚线 · O → Q']], controls:['tilt','turn'], space:true,
       choices:{key:'reading', label:'第 92 行', options:['执行前 · T / B / N','执行后 · X / Y / Z']}
     },
     refraction: {
@@ -1321,17 +1321,22 @@
     } else if (step === 'normal-result') {
       const localReading = focus.reading === 0;
       const amountByAxis = localReading ? ts : ws;
+      const directions = [tangent, bitangent, normal];
+      const legs = normalLegs(data);
       const tip = worldPos.map((value, index) => value + ws[index]);
       pictureValues([
-        [localReading ? '局部 T / B / N' : '世界 X / Y / Z', vecText(amountByAxis), localReading ? 'mapped' : 'sample'],
-        ['同一个粉色箭头尖', vecText(tip), 'mapped']
+        [localReading ? '执行前 bump · 切线 T / B / N' : '执行后 bump · 世界 X / Y / Z', vecText(amountByAxis), localReading ? 'mapped' : 'sample'],
+        ['粉色终点 Q · 世界位置', vecText(tip), 'mapped']
       ]);
       lesson([
-        ['换成世界读数后，再沿世界轴画一次', [
-          `执行前 bump ≈ ${vecText(ts)}　沿 T、B、N`,
-          `执行后 bump ≈ ${vecText(ws)}　沿世界 X、Y、Z`,
-          `Q 的世界位置 = P ${vecText(worldPos)} + 新 bump ≈ ${vecText(tip)}`
-        ], '两种画法都从 P 出发。执行前沿蓝、黄、绿三根局部轴走，执行后沿世界三轴走。本例的长度已经是 1，两条路线到达同一个粉色箭头尖。第 93 行用换算后的法线算倒影。', [92], {line:92, text:localReading ? 'dot(i.TtoW0.xyz, bump)' : 'normalize'}]
+        ['把蓝、黄、绿三段分别用世界 X、Y、Z 写出来', legs.map(({weight, delta}, index) =>
+          `${['蓝','黄','绿'][index]}段　${number(weight, 3)} × ${'TBN'[index]} ${vecText(directions[index])} ≈ ${vecText(delta)}`
+        ), '沿 T 走的距离是旧 bump.x。T 的朝向跟着玻璃，在括号里按世界 X、Y、Z 写。用距离乘这个朝向，就能把蓝段换成世界位移。黄段、绿段也这样算。'],
+        ['三段相加，得到从 P 到 Q 的世界位移', [
+          `${legs.map(({delta}) => vecText(delta)).join(' + ')} ≈ ${vecText(rawWS)}`,
+          `P → Q · 世界 bump ≈ ${vecText(ws)}`,
+          `O → Q · Q 的世界位置 ≈ ${vecText(worldPos)} + ${vecText(ws)} = ${vecText(tip)}`
+        ], '第 72 行把 P 的世界 X 放进第四格 .w，Y、Z 两行同理。第 92 行只用前三格 .xyz 换算法线，所以算出的是 P → Q 的世界位移。网页绘图时再加 P，才得到灰虚线 O → Q 的终点。', [72, 92], {line:92, text:'i.TtoW0.xyz'}]
       ], [
         ['normalize 统一长度', `换算后的长度 ≈ ${number(Math.hypot(...rawWS), 3)}`,
           '曲面上各顶点的轴可能不同，插值后的向量长度可以改变。第 92 行把三个世界分量都除以向量长度，得到单位法线。']

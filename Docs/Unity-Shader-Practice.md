@@ -18,6 +18,37 @@
 
 在[第 9 章前向渲染示例](../Assets/Shaders/Chapter9/Chapter9-ForwardRendering.shader)中，`normalize(_WorldSpaceCameraPos - i.worldPos)` 得到从表面点指向相机位置的单位向量。这是透视视线方向的常用写法；如果 Shader 同时支持正交相机，用 URP 的 `GetWorldSpaceNormalizeViewDir` 取得与投影类型一致的方向。
 
+<a id="vertex-clip-position"></a>
+## 为什么顶点着色器的 `SV_POSITION` 要写入裁剪坐标？
+
+第 11 章的序列帧 Shader 把 `pos` 声明为 `float4 pos : SV_POSITION`，并在 `vert` 中写入 `TransformObjectToHClip(v.vertex)`。`SV_POSITION` 是 GPU 用来识别绘制位置的系统语义。顶点阶段输出四分量的齐次裁剪坐标，光栅化阶段据此裁掉三角形越出相机视野的部分，再除以 `w`、映射到视口并确定覆盖的像素。 [序列帧 Shader](../Assets/Shaders/Chapter11/Chapter11-ImageSequenceAnimation.shader) · [Direct3D 光栅化阶段](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/rasterizer-block)
+
+URP 14.0.12 的 `SpaceTransforms.hlsl` 用内层 `mul` 先把模型坐标变到世界空间，外层 `mul` 再乘包含视图和投影变换的 `UNITY_MATRIX_VP`，从世界空间到达裁剪空间。
+
+```hlsl
+return mul(GetWorldToHClipMatrix(), mul(GetObjectToWorldMatrix(), float4(positionOS, 1.0)));
+```
+
+例如固定场景里的一个点，向右平移相机并保持朝向，点的世界坐标保持原值，沿相机右轴的坐标却会减小，所以投影向画面左边移。 [URP 14 顶点变换示例](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@14.0/manual/writing-shaders-urp-basic-unlit-structure.html) · [裁剪坐标怎样变成屏幕坐标](Graphics-Fundamentals.md#homogeneous-clip-space)
+
+如果光照等计算需要在片元阶段读取世界坐标，本章示例可以在 `v2f` 中加上 `float3 positionWS : TEXCOORD1`。`TEXCOORD0` 已传 UV，`TEXCOORD1` 用来传三个世界坐标分量。`vert` 中先求世界坐标，再用它求 `SV_POSITION` 所需的裁剪坐标。
+
+```hlsl
+o.positionWS = TransformObjectToWorld(v.vertex.xyz);
+o.pos = TransformWorldToHClip(o.positionWS);
+```
+
+GPU 在三角形的三个顶点之间插值，`frag(v2f i)` 可通过 `i.positionWS` 读取当前片元的世界坐标。
+
+<a id="texcoord-channels"></a>
+## 网格 UV 和 `TEXCOORD` 插值通道都是八个吗？
+
+Unity 2022.3 的一个 Mesh 最多存八套 UV，每套为各个顶点保存一组坐标。顶点输入 `a2v` 的 `float2 texcoord : TEXCOORD0` 读取第一套 `UV0`，到 `TEXCOORD7` 读取第八套 `UV7`。各套 UV 由网格按需提供。 [Unity 2022.3 网格顶点数据](https://docs.unity3d.com/2022.3/Documentation/Manual/AnatomyofaMesh.html#uvs)
+
+顶点输出 `v2f` 的 `float2 uv : TEXCOORD0` 则传递 `vert` 写进 `o.uv` 的值。这里的数字是顶点到片元的插值通道编号，数据来自顶点着色器的赋值。同一个 `v2f` 里的 `TEXCOORD1` 也可以用来传上一例计算的 `positionWS`。 [本章序列帧 Shader](../Assets/Shaders/Chapter11/Chapter11-ImageSequenceAnimation.shader) · [Unity 2022.3 Shader 语义](https://docs.unity3d.com/2022.3/Documentation/Manual/SL-ShaderSemantics.html)
+
+插值器数量受编译目标和 GPU 限制。Unity 2022.3 默认的 `#pragma target 2.5` 按 8 个插值器编写，`target 3.0` 则要求至少 10 个。 [Unity 2022.3 Shader 编译目标](https://docs.unity3d.com/2022.3/Documentation/Manual/SL-ShaderCompileTargets.html#valid-target-values)
+
 <a id="unpack-normal"></a>
 ## `UnpackNormal` 怎样把贴图通道还原成法线？
 
